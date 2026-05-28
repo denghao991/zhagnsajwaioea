@@ -48,6 +48,7 @@
       <div class="hint" id="upload-status">支持 .txt / .md / .pdf 文件</div>
     </div>
     <div class="chat-area">
+      <div id="context-area" style="display:none; background:#fff; border:1px solid #e0e0e0; border-radius:8px; padding:12px; margin-bottom:12px; font-size:13px; color:#666;"></div>
       <div class="messages" id="messages">
         <div class="message assistant">你好！请上传文档，然后向我提问。</div>
       </div>
@@ -94,29 +95,91 @@ async function ask() {
   input.value = '';
   btn.disabled = true;
   addMessage(question, 'user');
-  addMessage('思考中...', 'assistant', 'thinking');
+
+  const msgDiv = addMessage('', 'assistant');
+  const ctxArea = document.getElementById('context-area');
+  ctxArea.style.display = 'none';
+  ctxArea.innerHTML = '';
+
   try {
     const resp = await fetch('/ask', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({question}) });
-    const data = await resp.json();
-    document.querySelector('.thinking')?.remove();
-    if (resp.ok) {
-      let html = data.answer;
-      if (data.sources && data.sources.length) html += '<div class="sources">来源: ' + data.sources.join(', ') + '</div>';
-      addMessage(html, 'assistant');
-    } else {
-      addMessage('错误: ' + data.error, 'assistant');
+
+    if (!resp.ok) {
+      const data = await resp.json();
+      msgDiv.textContent = data.error || '请求失败';
+      btn.disabled = false;
+      return;
+    }
+
+    const contentType = resp.headers.get('content-type') || '';
+    if (!contentType.includes('event-stream')) {
+      const data = await resp.json();
+      msgDiv.textContent = data.answer || '未找到相关文档';
+      if (data.sources && data.sources.length) {
+        msgDiv.insertAdjacentHTML('beforeend', '<div class="sources">来源: ' + escapeHtml(data.sources.join(', ')) + '</div>');
+      }
+      btn.disabled = false;
+      return;
+    }
+
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let currentEvent = '';
+    let answerBuffer = '';
+
+    while (true) {
+      const {done, value} = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, {stream: true});
+
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+
+      for (const line of lines) {
+        if (line.startsWith('event: ')) {
+          currentEvent = line.slice(7);
+        } else if (line.startsWith('data: ')) {
+          const data = line.slice(6);
+          if (currentEvent === 'context') {
+            const chunks = JSON.parse(data);
+            let html = '<strong>找到以下相关内容：</strong><br>';
+            chunks.forEach(c => {
+              html += '<div style="padding:4px 0;border-bottom:1px solid #f0f0f0;">' + escapeHtml(c.text.substring(0, 120)) + '...</div>';
+            });
+            ctxArea.innerHTML = html;
+            ctxArea.style.display = 'block';
+          } else if (currentEvent === 'token') {
+            const token = JSON.parse(data);
+            answerBuffer += token;
+            msgDiv.textContent = answerBuffer;
+            msgDiv.scrollIntoView({behavior: 'smooth'});
+          } else if (currentEvent === 'done') {
+            const meta = JSON.parse(data);
+            if (meta.sources && meta.sources.length) {
+              msgDiv.insertAdjacentHTML('beforeend', '<div class="sources">来源: ' + escapeHtml(meta.sources.join(', ')) + '</div>');
+            }
+          }
+          currentEvent = '';
+        }
+      }
     }
   } catch {
-    document.querySelector('.thinking')?.remove();
-    addMessage('网络错误', 'assistant');
+    msgDiv.textContent = '网络错误';
   }
   btn.disabled = false;
+}
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
 }
 
 function addMessage(text, role, cls='') {
   const div = document.createElement('div');
   div.className = 'message ' + role + (cls ? ' ' + cls : '');
-  div.innerHTML = text;
+  div.textContent = text;
   document.getElementById('messages').appendChild(div);
   div.scrollIntoView({behavior: 'smooth'});
 }
