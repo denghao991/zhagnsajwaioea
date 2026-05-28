@@ -101,7 +101,8 @@ def ask():
         # 3. 结束事件
         yield f"event: done\ndata: {json.dumps({'sources': source_ids})}\n\n"
 
-    return Response(generate(), mimetype="text/event-stream")
+    return Response(generate(), mimetype="text/event-stream",
+                    headers={"Cache-Control": "no-cache", "Connection": "keep-alive"})
 
 
 @app.route("/documents", methods=["GET"])
