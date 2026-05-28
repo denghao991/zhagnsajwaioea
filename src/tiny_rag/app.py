@@ -4,7 +4,8 @@ import json
 import uuid
 from pathlib import Path
 
-from flask import Flask, Response, jsonify, request, render_template
+from flask import (Flask, Response, jsonify, request, render_template,
+                   stream_with_context)
 
 from src.tiny_rag.config import settings
 from src.tiny_rag.ingestion.loader import load_bytes, load_pdf
@@ -101,8 +102,8 @@ def ask():
         # 3. 结束事件
         yield f"event: done\ndata: {json.dumps({'sources': source_ids})}\n\n"
 
-    return Response(generate(), mimetype="text/event-stream",
-                    headers={"Cache-Control": "no-cache", "Connection": "keep-alive"})
+    return Response(stream_with_context(generate()), mimetype="text/event-stream",
+                    headers={"Cache-Control": "no-cache"})
 
 
 @app.route("/documents", methods=["GET"])
@@ -111,4 +112,5 @@ def documents():
 
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000, debug=True)
+    from waitress import serve
+    serve(app, host="0.0.0.0", port=5000)

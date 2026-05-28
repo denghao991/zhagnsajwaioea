@@ -152,6 +152,7 @@ async function ask() {
             answerBuffer += token;
             msgDiv.textContent = answerBuffer;
             msgDiv.scrollIntoView({behavior: 'smooth'});
+            await new Promise(resolve => setTimeout(resolve, 0));
           } else if (currentEvent === 'done') {
             const meta = JSON.parse(data);
             if (meta.sources && meta.sources.length) {

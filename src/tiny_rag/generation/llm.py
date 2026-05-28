@@ -1,4 +1,4 @@
-"""LLM client — GLM chat via OpenAI SDK."""
+"""LLM client — chat via OpenAI-compatible API."""
 
 from collections.abc import Generator
 
