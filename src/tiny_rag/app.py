@@ -1,9 +1,10 @@
 """Flask application — RAG system web server."""
 
+import json
 import uuid
 from pathlib import Path
 
-from flask import Flask, jsonify, request, render_template
+from flask import Flask, Response, jsonify, request, render_template
 
 from src.tiny_rag.config import settings
 from src.tiny_rag.ingestion.loader import load_bytes, load_pdf
@@ -88,11 +89,19 @@ def ask():
     if not results:
         return jsonify({"answer": "未找到相关文档，请先上传文档。", "sources": []})
 
-    context = "\n\n".join(r["text"] for r in results)
-    answer = llm.generate(question=question, context=context)
     source_ids = list({r["doc_id"] for r in results})
+    context = "\n\n".join(r["text"] for r in results)
 
-    return jsonify({"answer": answer, "sources": source_ids})
+    def generate():
+        # 1. 推送召回片段
+        yield f"event: context\ndata: {json.dumps(results)}\n\n"
+        # 2. 逐字推送 LLM token
+        for token in llm.generate_stream(question, context):
+            yield f"event: token\ndata: {json.dumps(token)}\n\n"
+        # 3. 结束事件
+        yield f"event: done\ndata: {json.dumps({'sources': source_ids})}\n\n"
+
+    return Response(generate(), mimetype="text/event-stream")
 
 
 @app.route("/documents", methods=["GET"])
