@@ -132,6 +132,7 @@ def ask():
 
     # ── 正常检索 + LLM 流程 ──
     # ── 双路检索 + RRF 合并 ──
+    # n_results=10 on RRF: pass all unique candidates (max 10) to reranker for re-ranking
     vector_results = vector_store.search(question_embedding, n_results=5)
     bm25_results = bm25_retriever.search(question, n_results=5)
     results = rrf_merge(vector_results, bm25_results, n_results=10)

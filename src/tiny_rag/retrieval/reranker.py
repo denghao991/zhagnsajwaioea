@@ -15,6 +15,10 @@ class RerankClient:
 
     Wraps the ``POST /api/v1/services/rerank/text-rerank/text-rerank``
     endpoint.  Falls back to the original order on any API error.
+
+    Note: Unlike EmbeddingClient (which uses an OpenAI-compatible endpoint),
+    the DashScope Rerank API has its own non-OpenAI-compatible format, so we
+    call it directly via HTTP POST instead of through the OpenAI SDK.
     """
 
     def __init__(self, base_url: str, api_key: str, model: str) -> None:
