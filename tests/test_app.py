@@ -35,6 +35,15 @@ def test_get_documents_empty(client):
     assert isinstance(data["documents"], list)
 
 
+def test_stats_returns_counters(client):
+    resp = client.get("/stats")
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data is not None
+    for key in ("hits", "misses", "total_requests", "hit_rate", "cache_entries", "force_refreshes", "poisoned_skips", "recent_misses"):
+        assert key in data
+
+
 def test_ask_no_question(client):
     resp = client.post("/ask", json={})
     assert resp.status_code == 400

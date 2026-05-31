@@ -13,6 +13,7 @@ from src.tiny_rag.ingestion.chunker import chunk_text
 from src.tiny_rag.embedding.client import EmbeddingClient
 from src.tiny_rag.storage.vector_store import VectorStore
 from src.tiny_rag.generation.llm import LLMClient
+from src.tiny_rag.cache.semantic_cache import SemanticCache
 
 ALLOWED_EXTENSIONS = {".txt", ".md", ".pdf"}
 
@@ -25,6 +26,8 @@ embedder = EmbeddingClient(
 )
 
 vector_store = VectorStore(persist_dir=settings.chroma_persist_dir)
+
+cache = SemanticCache(persist_dir=settings.chroma_persist_dir)
 
 llm = LLMClient(
     base_url=settings.glm_base_url,
@@ -72,7 +75,9 @@ def upload():
         return jsonify({"error": "Empty document"}), 400
 
     embeddings = embedder.embed(chunks)
-    vector_store.add_document(doc_id=doc_id, chunks=chunks, embeddings=embeddings)
+    vector_store.add_document(doc_id=doc_id, filename=file.filename, chunks=chunks, embeddings=embeddings)
+
+    cache.clear()
 
     return jsonify({"id": doc_id, "filename": file.filename, "chunks": len(chunks)})
 
@@ -84,31 +89,99 @@ def ask():
         return jsonify({"error": "Missing 'question' field"}), 400
 
     question = body["question"]
+    force_refresh = body.get("force_refresh", False)
+
     question_embedding = embedder.embed([question])[0]
+
+    # ── 语义缓存检查 ──
+    if not force_refresh:
+        cached = cache.search(query_embedding=question_embedding)
+        if cached and not cached["poisoned"]:
+            cache.hits += 1
+
+            def generate_cached():
+                yield f"event: context\ndata: {json.dumps(cached['sources'])}\n\n"
+                answer = cached["answer"]
+                segments = [answer[i:i+3] for i in range(0, len(answer), 3)]
+                for seg in segments:
+                    yield f"event: token\ndata: {json.dumps(seg)}\n\n"
+                yield f"event: done\ndata: {json.dumps({'cached': True})}\n\n"
+
+            return Response(
+                stream_with_context(generate_cached()),
+                mimetype="text/event-stream",
+                headers={"Cache-Control": "no-cache"},
+            )
+        elif cached and cached["poisoned"]:
+            cache.poisoned_skips += 1
+        else:
+            cache.misses += 1
+            cache.record_miss(question)
+
+    # ── 正常检索 + LLM 流程 ──
     results = vector_store.search(question_embedding, n_results=5)
 
     if not results:
         return jsonify({"answer": "未找到相关文档，请先上传文档。", "sources": []})
 
-    source_ids = list({r["doc_id"] for r in results})
+    # 去重后的来源（按 doc_id）
+    seen = {}
+    for r in results:
+        seen.setdefault(r["doc_id"], r.get("filename", r["doc_id"]))
+    source_info = [{"id": doc_id, "name": name} for doc_id, name in seen.items()]
     context = "\n\n".join(r["text"] for r in results)
 
-    def generate():
+    # 确定 entry_id（force_refresh 时复用已有缓存条目）
+    if force_refresh:
+        cache.force_refreshes += 1
+        found_entry_id = cache.get_entry_id(embedding=question_embedding)
+        entry_id = found_entry_id if found_entry_id else f"cache_{uuid.uuid4().hex[:12]}"
+    else:
+        entry_id = f"cache_{uuid.uuid4().hex[:12]}"
+
+    answer_buffer: list[str] = []
+
+    def generate_and_cache():
         # 1. 推送召回片段
         yield f"event: context\ndata: {json.dumps(results)}\n\n"
-        # 2. 逐字推送 LLM token
-        for token in llm.generate_stream(question, context):
-            yield f"event: token\ndata: {json.dumps(token)}\n\n"
-        # 3. 结束事件
-        yield f"event: done\ndata: {json.dumps({'sources': source_ids})}\n\n"
 
-    return Response(stream_with_context(generate()), mimetype="text/event-stream",
-                    headers={"Cache-Control": "no-cache"})
+        # 2. 逐字推送 LLM token + 收集完整回答
+        for token in llm.generate_stream(question, context):
+            answer_buffer.append(token)
+            yield f"event: token\ndata: {json.dumps(token)}\n\n"
+
+        # 3. 存入缓存
+        full_answer = "".join(answer_buffer)
+        cache.put(
+            question=question,
+            answer=full_answer,
+            embedding=question_embedding,
+            sources=results,
+            entry_id=entry_id,
+        )
+
+        # 4. force_refresh 时更新 refresh_count
+        if force_refresh:
+            cache.mark_refreshed(entry_id)
+
+        # 5. 结束事件
+        yield f"event: done\ndata: {json.dumps({'sources': source_info})}\n\n"
+
+    return Response(
+        stream_with_context(generate_and_cache()),
+        mimetype="text/event-stream",
+        headers={"Cache-Control": "no-cache"},
+    )
 
 
 @app.route("/documents", methods=["GET"])
 def documents():
     return jsonify({"documents": vector_store.list_documents()})
+
+
+@app.route("/stats", methods=["GET"])
+def stats():
+    return jsonify(cache.get_stats())
 
 
 if __name__ == "__main__":

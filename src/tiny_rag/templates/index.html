@@ -86,20 +86,20 @@ document.getElementById('file-input').addEventListener('change', async function(
   e.target.value = '';
 });
 
-async function ask() {
+async function doAsk(question, forceRefresh) {
   const input = document.getElementById('question-input');
   const btn = document.getElementById('ask-btn');
-  const question = input.value.trim();
-  if (!question) return;
-  input.value = '';
   btn.disabled = true;
   addMessage(question, 'user');
 
   const msgDiv = addMessage('', 'assistant');
   const messagesEl = document.getElementById('messages');
+  let questionText = question;
 
   try {
-    const resp = await fetch('/ask', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({question}) });
+    const body = { question };
+    if (forceRefresh) body.force_refresh = true;
+    const resp = await fetch('/ask', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) });
 
     if (!resp.ok) {
       const data = await resp.json();
@@ -143,7 +143,10 @@ async function ask() {
             let contextHtml = '<div style="font-size:13px;color:#666;padding:8px 0;">';
             contextHtml += '<strong style="color:#333;">找到以下相关内容：</strong><br>';
             chunks.forEach(c => {
-              contextHtml += '<div style="padding:4px 0;border-bottom:1px solid #f0f0f0;">' + escapeHtml(c.text.substring(0, 120)) + '...</div>';
+              const name = c.filename || c.doc_id;
+              contextHtml += '<div style="padding:4px 0;border-bottom:1px solid #f0f0f0;">';
+              contextHtml += '<span style="color:#4a90d9;font-size:12px;">' + escapeHtml(name) + '</span><br>';
+              contextHtml += escapeHtml(c.text.substring(0, 120)) + '...</div>';
             });
             contextHtml += '</div>';
             msgDiv.insertAdjacentHTML('beforebegin', '<div class="message context" style="background:#f8f9fa;border:1px solid #e0e0e0;border-radius:12px;padding:12px 16px;margin-bottom:12px;font-size:14px;line-height:1.6;">' + contextHtml + '</div>');
@@ -156,7 +159,25 @@ async function ask() {
           } else if (currentEvent === 'done') {
             const meta = JSON.parse(data);
             if (meta.sources && meta.sources.length) {
-              msgDiv.insertAdjacentHTML('beforeend', '<div class="sources">来源: ' + escapeHtml(meta.sources.join(', ')) + '</div>');
+              const names = meta.sources.map(s => s.name || s.id);
+              msgDiv.insertAdjacentHTML('beforeend', '<div class="sources">来源: ' + escapeHtml(names.join(', ')) + '</div>');
+            }
+            if (meta.cached) {
+              const row = document.createElement('div');
+              row.style.cssText = 'font-size:12px;color:#999;margin-top:8px;display:flex;align-items:center;gap:8px;';
+              row.innerHTML = '<span>此回答来自缓存</span>';
+              const refreshBtn = document.createElement('button');
+              refreshBtn.textContent = '重新生成';
+              refreshBtn.style.cssText = 'padding:2px 10px;font-size:12px;border:1px solid #d0d0d0;border-radius:4px;background:#fff;cursor:pointer;';
+              refreshBtn.onclick = function() {
+                refreshBtn.disabled = true;
+                refreshBtn.textContent = '重新生成中...';
+                msgDiv.innerHTML = '';
+                answerBuffer = '';
+                doAsk(questionText, true);
+              };
+              row.appendChild(refreshBtn);
+              msgDiv.appendChild(row);
             }
           }
           currentEvent = '';
@@ -169,6 +190,14 @@ async function ask() {
     }
   }
   btn.disabled = false;
+}
+
+async function ask() {
+  const input = document.getElementById('question-input');
+  const question = input.value.trim();
+  if (!question) return;
+  input.value = '';
+  doAsk(question, false);
 }
 
 function escapeHtml(str) {
