@@ -16,6 +16,7 @@ from src.tiny_rag.generation.llm import LLMClient
 from src.tiny_rag.cache.semantic_cache import SemanticCache
 from src.tiny_rag.retrieval.bm25 import BM25Retriever
 from src.tiny_rag.retrieval.hybrid import rrf_merge
+from src.tiny_rag.retrieval.reranker import RerankClient
 
 ALLOWED_EXTENSIONS = {".txt", ".md", ".pdf"}
 
@@ -38,6 +39,12 @@ llm = LLMClient(
 )
 
 bm25_retriever = BM25Retriever()
+
+reranker = RerankClient(
+    base_url=settings.rerank_base_url,
+    api_key=settings.rerank_api_key,
+    model=settings.rerank_model,
+)
 
 
 @app.route("/")
@@ -125,9 +132,13 @@ def ask():
 
     # ── 正常检索 + LLM 流程 ──
     # ── 双路检索 + RRF 合并 ──
-    vector_results = vector_store.search(question_embedding, n_results=10)
-    bm25_results = bm25_retriever.search(question, n_results=10)
-    results = rrf_merge(vector_results, bm25_results, n_results=5)
+    vector_results = vector_store.search(question_embedding, n_results=5)
+    bm25_results = bm25_retriever.search(question, n_results=5)
+    results = rrf_merge(vector_results, bm25_results, n_results=10)
+    if results and settings.rerank_api_key:
+        results = reranker.rerank(question, results, top_n=5)
+    elif results:
+        results = results[:5]
 
     if not results:
         return jsonify({"answer": "未找到相关文档，请先上传文档。", "sources": []})
