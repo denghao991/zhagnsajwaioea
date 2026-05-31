@@ -14,6 +14,8 @@ from src.tiny_rag.embedding.client import EmbeddingClient
 from src.tiny_rag.storage.vector_store import VectorStore
 from src.tiny_rag.generation.llm import LLMClient
 from src.tiny_rag.cache.semantic_cache import SemanticCache
+from src.tiny_rag.retrieval.bm25 import BM25Retriever
+from src.tiny_rag.retrieval.hybrid import rrf_merge
 
 ALLOWED_EXTENSIONS = {".txt", ".md", ".pdf"}
 
@@ -34,6 +36,8 @@ llm = LLMClient(
     api_key=settings.glm_api_key,
     model=settings.glm_model,
 )
+
+bm25_retriever = BM25Retriever()
 
 
 @app.route("/")
@@ -76,6 +80,7 @@ def upload():
 
     embeddings = embedder.embed(chunks)
     vector_store.add_document(doc_id=doc_id, filename=file.filename, chunks=chunks, embeddings=embeddings)
+    bm25_retriever.add_document(doc_id=doc_id, filename=file.filename, chunks=chunks)
 
     cache.clear()
 
@@ -119,7 +124,10 @@ def ask():
             cache.record_miss(question)
 
     # ── 正常检索 + LLM 流程 ──
-    results = vector_store.search(question_embedding, n_results=5)
+    # ── 双路检索 + RRF 合并 ──
+    vector_results = vector_store.search(question_embedding, n_results=10)
+    bm25_results = bm25_retriever.search(question, n_results=10)
+    results = rrf_merge(vector_results, bm25_results, n_results=5)
 
     if not results:
         return jsonify({"answer": "未找到相关文档，请先上传文档。", "sources": []})
