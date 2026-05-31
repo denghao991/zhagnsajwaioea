@@ -7,7 +7,7 @@ class BM25Retriever:
     """BM25 index over document chunks for keyword-style retrieval.
 
     Maintains an independent copy of chunk texts alongside VectorStore.
-    Rebuilds the BM25 index incrementally as documents are added.
+    Rebuilds the BM25 index from scratch on each add.
     """
 
     def __init__(self) -> None:
@@ -28,7 +28,6 @@ class BM25Retriever:
             filename: Original filename.
             chunks: List of text chunks.
         """
-        start = len(self._chunks)
         self._chunks.extend(chunks)
         self._metadatas.extend(
             {"doc_id": doc_id, "filename": filename, "chunk_index": i}
