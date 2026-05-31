@@ -122,24 +122,23 @@ def test_ask_invokes_rerank_when_configured(client):
     from unittest.mock import ANY, patch, Mock
     from src.tiny_rag.config import settings
 
-    # Force the rerank key so the branch is taken
-    original_key = settings.rerank_api_key
-    settings.rerank_api_key = "sk-test"
-
     mock_docs = [
         {"text": "test chunk", "doc_id": "doc1", "filename": "test.md", "chunk_index": 0, "score": 0.9},
     ]
 
-    with (
-        patch("src.tiny_rag.app.embedder.embed", return_value=[[0.1] * 768]),
-        patch("src.tiny_rag.app.vector_store.search", return_value=mock_docs),
-        patch("src.tiny_rag.app.bm25_retriever.search", return_value=[]),
-        patch("src.tiny_rag.app.llm.generate_stream", return_value=iter(["answer"])),
-        patch("src.tiny_rag.app.reranker.rerank", return_value=mock_docs) as mock_rerank,
-    ):
-        resp = client.post("/ask", json={"question": "test query"})
-
-    settings.rerank_api_key = original_key
+    original_key = settings.rerank_api_key
+    settings.rerank_api_key = "sk-test"
+    try:
+        with (
+            patch("src.tiny_rag.app.embedder.embed", return_value=[[0.1] * 768]),
+            patch("src.tiny_rag.app.vector_store.search", return_value=mock_docs),
+            patch("src.tiny_rag.app.bm25_retriever.search", return_value=[]),
+            patch("src.tiny_rag.app.llm.generate_stream", return_value=iter(["answer"])),
+            patch("src.tiny_rag.app.reranker.rerank", return_value=mock_docs) as mock_rerank,
+        ):
+            resp = client.post("/ask", json={"question": "test query"})
+    finally:
+        settings.rerank_api_key = original_key
 
     assert resp.status_code == 200
     mock_rerank.assert_called_once()

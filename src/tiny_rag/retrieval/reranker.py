@@ -44,13 +44,13 @@ class RerankClient:
             ``"score"`` updated from the API.
         """
         if not documents or not query.strip():
-            return documents[:top_n] if top_n else documents
+            return documents[:top_n] if top_n is not None else documents
 
         try:
             texts = [d["text"] for d in documents]
         except KeyError:
             logger.warning("Rerank input missing 'text' key, falling back to original order")
-            return documents[:top_n] if top_n else documents
+            return documents[:top_n] if top_n is not None else documents
 
         try:
             payload: dict[str, Any] = {
@@ -69,11 +69,11 @@ class RerankClient:
             )
             resp.raise_for_status()
             data = resp.json()
+            results = data["output"]["results"]
         except (httpx.HTTPError, json.JSONDecodeError, KeyError):
             logger.warning("Rerank API call failed, falling back to original order", exc_info=True)
-            return documents[:top_n] if top_n else documents
+            return documents[:top_n] if top_n is not None else documents
 
-        results = data["output"]["results"]
         ranked: list[dict[str, Any]] = []
         for item in results:
             idx = item["index"]
