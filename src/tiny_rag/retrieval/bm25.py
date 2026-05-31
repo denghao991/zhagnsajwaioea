@@ -1,5 +1,6 @@
 """BM25 keyword retriever — exact-match complement to vector search."""
 
+import jieba
 from rank_bm25 import BM25Okapi
 
 
@@ -79,5 +80,5 @@ class BM25Retriever:
 
     @staticmethod
     def _tokenize(text: str) -> list[str]:
-        """Simple whitespace+punctuation tokenizer for Chinese text."""
-        return text.lower().split()
+        """Chinese-aware tokenizer using jieba."""
+        return jieba.lcut(text)
