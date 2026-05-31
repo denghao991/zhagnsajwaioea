@@ -16,10 +16,10 @@ def rrf_merge(
         n_results: Number of top results to return.
 
     Returns:
-        Merged and sorted result list (text-deduplicated), keeping all
-        keys from the source with higher RRF contribution.
+        Merged and sorted result list (text-deduplicated), preferring
+        vector result dict when the same chunk appears in both lists.
     """
-    # Build per-document RRF scores, keyed by chunk text (exact dedup)
+    # Build per-document RRF scores; prefer vector result on conflict
     scores: dict[str, float] = {}
     best_result: dict[str, dict] = {}
 
