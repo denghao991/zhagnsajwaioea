@@ -2,6 +2,7 @@
 
 from unittest.mock import Mock, patch
 
+import httpx
 import pytest
 
 from src.tiny_rag.retrieval.reranker import RerankClient
@@ -35,7 +36,7 @@ def test_rerank_success(client: RerankClient) -> None:
         },
         "usage": {"total_tokens": 30},
     }
-    mock_resp.raise_for_status = lambda: None
+    mock_resp.raise_for_status = Mock(return_value=None)
 
     with patch("httpx.post", return_value=mock_resp) as mock_post:
         result = client.rerank("ECS是什么", docs, top_n=3)
@@ -75,7 +76,7 @@ def test_rerank_api_error_fallback(client: RerankClient) -> None:
         {"text": "doc b", "doc_id": "d2"},
         {"text": "doc c", "doc_id": "d3"},
     ]
-    with patch("httpx.post", side_effect=Exception("timeout")):
+    with patch("httpx.post", side_effect=httpx.ConnectError("connection failed")):
         result = client.rerank("test query", docs, top_n=2)
 
     # 回退到原始顺序的前 top_n 条
@@ -85,24 +86,29 @@ def test_rerank_api_error_fallback(client: RerankClient) -> None:
 
 
 def test_rerank_top_n_less_than_total(client: RerankClient) -> None:
-    """top_n returns only N results."""
+    """top_n returns only N results, sorted by score."""
     docs = [{"text": f"doc {i}", "doc_id": f"d{i}"} for i in range(5)]
     mock_resp = Mock()
     mock_resp.status_code = 200
     mock_resp.json.return_value = {
         "output": {
             "results": [
-                {"index": i, "relevance_score": 1.0 - i * 0.1} for i in range(2)
+                {"index": 3, "relevance_score": 0.9},
+                {"index": 1, "relevance_score": 0.7},
             ]
         },
         "usage": {"total_tokens": 20},
     }
-    mock_resp.raise_for_status = lambda: None
+    mock_resp.raise_for_status = Mock(return_value=None)
 
     with patch("httpx.post", return_value=mock_resp):
         result = client.rerank("query", docs, top_n=2)
 
     assert len(result) == 2
+    assert result[0]["doc_id"] == "d3"  # index 3, score 0.9
+    assert result[1]["doc_id"] == "d1"  # index 1, score 0.7
+    assert result[0]["score"] == 0.9
+    assert result[1]["score"] == 0.7
 
 
 def test_rerank_returns_ordered_by_score(client: RerankClient) -> None:
@@ -124,7 +130,7 @@ def test_rerank_returns_ordered_by_score(client: RerankClient) -> None:
         },
         "usage": {"total_tokens": 30},
     }
-    mock_resp.raise_for_status = lambda: None
+    mock_resp.raise_for_status = Mock(return_value=None)
 
     with patch("httpx.post", return_value=mock_resp):
         result = client.rerank("query", docs, top_n=3)
