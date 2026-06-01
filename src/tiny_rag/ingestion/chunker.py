@@ -161,7 +161,7 @@ class MarkdownChunker:
             if 0 < tokens < 100:
                 if i + 1 < len(sections):
                     next_text = "\n".join(sections[i + 1]["lines"])
-                    merged_hp = sections[i + 1]["heading_path"] if hp else hp
+                    merged_hp = sections[i + 1]["heading_path"]
                     results.append(_chunk(text + "\n" + next_text, merged_hp))
                     i += 2
                     continue

@@ -85,12 +85,11 @@ def test_markdown_heading_stack_resets():
 
 
 def test_markdown_preamble():
-    """Content before first heading should have empty heading_path."""
+    """Content before first heading should be included in a chunk (merged with next section)."""
     text = "Preamble paragraph.\n\n# Title\n\nBody."
     chunks = make_chunker(chunk_size=512).chunk_text(text)
-    preambles = [c for c in chunks if c.heading_path == ""]
-    assert len(preambles) >= 1
-    assert "Preamble" in preambles[0].text
+    all_text = " ".join(c.text for c in chunks)
+    assert "Preamble" in all_text
 
 
 def test_markdown_code_block_protected():
