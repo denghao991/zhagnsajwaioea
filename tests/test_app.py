@@ -118,7 +118,7 @@ def test_markdown_upload(client):
 
 
 def test_ask_invokes_rerank_when_configured(client):
-    """RerankClient.rerank is called in /ask when rerank_api_key is set."""
+    """RerankClient.rerank is called in /ask when rerank_llm_api_key is set."""
     from unittest.mock import ANY, patch, Mock
     from src.tiny_rag.config import settings
 
@@ -126,8 +126,8 @@ def test_ask_invokes_rerank_when_configured(client):
         {"text": "test chunk", "doc_id": "doc1", "filename": "test.md", "chunk_index": 0, "score": 0.9},
     ]
 
-    original_key = settings.rerank_api_key
-    settings.rerank_api_key = "sk-test"
+    original_key = settings.rerank_llm_api_key
+    settings.rerank_llm_api_key = "sk-test"
     try:
         with (
             patch("src.tiny_rag.app.embedder.embed", return_value=[[0.1] * 768]),
@@ -138,7 +138,7 @@ def test_ask_invokes_rerank_when_configured(client):
         ):
             resp = client.post("/ask", json={"question": "test query"})
     finally:
-        settings.rerank_api_key = original_key
+        settings.rerank_llm_api_key = original_key
 
     assert resp.status_code == 200
     mock_rerank.assert_called_once()
@@ -149,7 +149,7 @@ def test_ask_invokes_rerank_when_configured(client):
 
 
 def test_ask_skips_rerank_when_key_empty(client):
-    """Rerank is not called when rerank_api_key is empty."""
+    """Rerank is not called when rerank_llm_api_key is empty."""
     from unittest.mock import patch
 
     mock_docs = [
@@ -167,3 +167,46 @@ def test_ask_skips_rerank_when_key_empty(client):
 
     assert resp.status_code == 200
     mock_rerank.assert_not_called()
+
+
+def test_upload_web_no_url(client):
+    resp = client.post("/upload_web", json={})
+    assert resp.status_code == 400
+    data = resp.get_json()
+    assert data is not None
+    assert "error" in data
+
+
+def test_upload_web_success(client):
+    """Mock WebLoader to return a fake page."""
+    from unittest.mock import patch
+    from src.tiny_rag.ingestion.web_loader import PageResult
+
+    with (
+        patch("src.tiny_rag.app.web_loader.load", return_value=[
+            PageResult(url="https://wiki.example.com/page", markdown="# Hello\n\nWorld", depth=0),
+        ]),
+        patch("src.tiny_rag.app.embedder.embed", return_value=[[0.1] * 768]),
+        patch("src.tiny_rag.app.vector_store.add_document"),
+        patch("src.tiny_rag.app.bm25_retriever.add_document"),
+        patch("src.tiny_rag.app.cache.clear"),
+    ):
+        resp = client.post("/upload_web", json={"url": "https://wiki.example.com/page"})
+
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data is not None
+    assert data["pages"] == 1
+    assert len(data["results"]) == 1
+    assert data["results"][0]["url"] == "https://wiki.example.com/page"
+    assert data["results"][0]["chunks"] >= 1
+
+
+def test_upload_web_fetch_fails(client):
+    from unittest.mock import patch
+
+    with patch("src.tiny_rag.app.web_loader.load", return_value=[]):
+        resp = client.post("/upload_web", json={"url": "https://wiki.example.com/page"})
+
+    assert resp.status_code == 400
+    assert "error" in resp.get_json()

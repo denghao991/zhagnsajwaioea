@@ -9,7 +9,8 @@ from flask import (Flask, Response, jsonify, request, render_template,
 
 from src.tiny_rag.config import settings
 from src.tiny_rag.ingestion.loader import load_bytes, load_pdf
-from src.tiny_rag.ingestion.chunker import chunk_text
+from src.tiny_rag.ingestion.chunker import MarkdownChunker
+from src.tiny_rag.ingestion.web_loader import WebLoader
 from src.tiny_rag.embedding.client import EmbeddingClient
 from src.tiny_rag.storage.vector_store import VectorStore
 from src.tiny_rag.generation.llm import LLMClient
@@ -33,18 +34,25 @@ vector_store = VectorStore(persist_dir=settings.chroma_persist_dir)
 cache = SemanticCache(persist_dir=settings.chroma_persist_dir)
 
 llm = LLMClient(
-    base_url=settings.glm_base_url,
-    api_key=settings.glm_api_key,
-    model=settings.glm_model,
+    base_url=settings.llm_base_url,
+    api_key=settings.llm_api_key,
+    model=settings.llm_model,
 )
 
 bm25_retriever = BM25Retriever()
 
 reranker = RerankClient(
-    base_url=settings.rerank_base_url,
-    api_key=settings.rerank_api_key,
-    model=settings.rerank_model,
+    base_url=settings.rerank_llm_base_url,
+    api_key=settings.rerank_llm_api_key,
+    model=settings.rerank_llm_model,
 )
+
+chunker = MarkdownChunker(
+    chunk_size=settings.chunk_size,
+    chunk_overlap=settings.chunk_overlap,
+)
+
+web_loader = WebLoader(max_depth=20)
 
 
 @app.route("/")
@@ -76,22 +84,48 @@ def upload():
     else:
         content = load_bytes(raw)
 
-    chunks = chunk_text(
-        content,
-        chunk_size=settings.chunk_size,
-        chunk_overlap=settings.chunk_overlap,
-    )
-
+    chunks = chunker.chunk_text(content)
     if not chunks:
         return jsonify({"error": "Empty document"}), 400
 
-    embeddings = embedder.embed(chunks)
+    embeddings = embedder.embed([c.text for c in chunks])
     vector_store.add_document(doc_id=doc_id, filename=file.filename, chunks=chunks, embeddings=embeddings)
-    bm25_retriever.add_document(doc_id=doc_id, filename=file.filename, chunks=chunks)
+    bm25_retriever.add_document(doc_id=doc_id, filename=file.filename, chunks=[c.text for c in chunks])
 
     cache.clear()
 
     return jsonify({"id": doc_id, "filename": file.filename, "chunks": len(chunks)})
+
+
+@app.route("/upload_web", methods=["POST"])
+def upload_web():
+    body = request.get_json(silent=True)
+    if not body or "url" not in body:
+        return jsonify({"error": "Missing 'url' field"}), 400
+
+    url = body["url"]
+    max_depth = body.get("max_depth", 20)
+
+    pages = web_loader.load(url, max_depth=max_depth)
+    if not pages:
+        return jsonify({"error": "No pages could be fetched from the URL"}), 400
+
+    results: list[dict] = []
+    for page in pages:
+        doc_id = f"doc_{uuid.uuid4().hex[:12]}"
+        chunks = chunker.chunk_text(page.markdown)
+        if not chunks:
+            continue
+
+        embeddings = embedder.embed([c.text for c in chunks])
+        vector_store.add_document(doc_id=doc_id, filename=page.url, chunks=chunks, embeddings=embeddings)
+        bm25_retriever.add_document(doc_id=doc_id, filename=page.url, chunks=[c.text for c in chunks])
+
+        results.append({"url": page.url, "chunks": len(chunks)})
+
+    cache.clear()
+
+    return jsonify({"pages": len(results), "results": results})
 
 
 @app.route("/ask", methods=["POST"])
@@ -136,7 +170,7 @@ def ask():
     vector_results = vector_store.search(question_embedding, n_results=5)
     bm25_results = bm25_retriever.search(question, n_results=5)
     results = rrf_merge(vector_results, bm25_results, n_results=10)
-    if results and settings.rerank_api_key:
+    if results and settings.rerank_llm_api_key:
         results = reranker.rerank(question, results, top_n=5)
     elif results:
         results = results[:5]
