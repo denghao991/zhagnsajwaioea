@@ -1,12 +1,9 @@
 """Chunker — split text into chunks with Markdown-aware semantic boundaries."""
 
 import re
-import logging
 from dataclasses import dataclass
 
 from .tokenizer import count_tokens, encode, decode
-
-logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -220,7 +217,7 @@ class MarkdownChunker:
             ))
 
         # Single huge paragraph -> try line split
-        if len(chunks) == 1 and current_tokens > self.chunk_size:
+        if len(chunks) == 1 and chunks[0].token_count > self.chunk_size:
             return self._split_by_lines(text, heading_path)
 
         self._apply_overlap(chunks)
@@ -258,7 +255,7 @@ class MarkdownChunker:
                 token_count=current_tokens,
             ))
 
-        if len(chunks) == 1 and current_tokens > self.chunk_size:
+        if len(chunks) == 1 and chunks[0].token_count > self.chunk_size:
             return self._split_by_tokens(text, heading_path)
 
         self._apply_overlap(chunks)
@@ -294,5 +291,5 @@ class MarkdownChunker:
                 overlap_text = chunks[i - 1].text
             else:
                 overlap_text = decode(prev_tokens[-self.chunk_overlap:])
-            chunks[i].text = overlap_text + chunks[i].text
+            chunks[i].text = overlap_text + "\n\n" + chunks[i].text
             chunks[i].token_count = count_tokens(chunks[i].text)
