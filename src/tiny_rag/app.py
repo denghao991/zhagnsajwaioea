@@ -137,7 +137,10 @@ def ask():
     question = body["question"]
     force_refresh = body.get("force_refresh", False)
 
-    question_embedding = embedder.embed([question])[0]
+    # ── 查询改写 ──
+    rewritten = llm.rewrite(question)
+
+    question_embedding = embedder.embed([rewritten])[0]
 
     # ── 语义缓存检查 ──
     if not force_refresh:
@@ -200,14 +203,14 @@ def ask():
         yield f"event: context\ndata: {json.dumps(results)}\n\n"
 
         # 2. 逐字推送 LLM token + 收集完整回答
-        for token in llm.generate_stream(question, context):
+        for token in llm.generate_stream(rewritten, context):
             answer_buffer.append(token)
             yield f"event: token\ndata: {json.dumps(token)}\n\n"
 
         # 3. 存入缓存
         full_answer = "".join(answer_buffer)
         cache.put(
-            question=question,
+            question=rewritten,
             answer=full_answer,
             embedding=question_embedding,
             sources=results,

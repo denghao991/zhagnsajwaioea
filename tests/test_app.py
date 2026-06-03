@@ -133,6 +133,7 @@ def test_ask_invokes_rerank_when_configured(client):
             patch("src.tiny_rag.app.embedder.embed", return_value=[[0.1] * 768]),
             patch("src.tiny_rag.app.vector_store.search", return_value=mock_docs),
             patch("src.tiny_rag.app.bm25_retriever.search", return_value=[]),
+            patch("src.tiny_rag.app.llm.rewrite", return_value="test query"),
             patch("src.tiny_rag.app.llm.generate_stream", return_value=iter(["answer"])),
             patch("src.tiny_rag.app.reranker.rerank", return_value=mock_docs) as mock_rerank,
         ):
@@ -151,19 +152,26 @@ def test_ask_invokes_rerank_when_configured(client):
 def test_ask_skips_rerank_when_key_empty(client):
     """Rerank is not called when rerank_llm_api_key is empty."""
     from unittest.mock import patch
+    from src.tiny_rag.config import settings
 
     mock_docs = [
         {"text": "test chunk", "doc_id": "doc1", "filename": "test.md", "chunk_index": 0},
     ]
 
-    with (
-        patch("src.tiny_rag.app.embedder.embed", return_value=[[0.1] * 768]),
-        patch("src.tiny_rag.app.vector_store.search", return_value=mock_docs),
-        patch("src.tiny_rag.app.bm25_retriever.search", return_value=[]),
-        patch("src.tiny_rag.app.llm.generate_stream", return_value=iter(["answer"])),
-        patch("src.tiny_rag.app.reranker.rerank") as mock_rerank,
-    ):
-        resp = client.post("/ask", json={"question": "test query"})
+    original_key = settings.rerank_llm_api_key
+    settings.rerank_llm_api_key = ""
+    try:
+        with (
+            patch("src.tiny_rag.app.embedder.embed", return_value=[[0.1] * 768]),
+            patch("src.tiny_rag.app.vector_store.search", return_value=mock_docs),
+            patch("src.tiny_rag.app.bm25_retriever.search", return_value=[]),
+            patch("src.tiny_rag.app.llm.rewrite", return_value="test query"),
+            patch("src.tiny_rag.app.llm.generate_stream", return_value=iter(["answer"])),
+            patch("src.tiny_rag.app.reranker.rerank") as mock_rerank,
+        ):
+            resp = client.post("/ask", json={"question": "test query"})
+    finally:
+        settings.rerank_llm_api_key = original_key
 
     assert resp.status_code == 200
     mock_rerank.assert_not_called()
