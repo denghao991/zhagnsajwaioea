@@ -9,6 +9,22 @@ _SYSTEM_PROMPT = """你是一个基于文档内容回答问题的助手。
 如果你在文档中找不到相关信息，请诚实地说明你不知道。
 不要编造信息。"""
 
+_REWRITE_PROMPT = """你是一个RAG系统的问题改写助手。请将用户的口语化问题改写为规范的文档术语表述。
+
+已知术语映射：
+{abbreviations}
+
+{pattern}
+
+要求：
+- 保持原意完全不变
+- 将缩写替换为全称
+- 将检查项名称展开为自然问题
+- 仅输出改写后的问题，不要解释，不要加前缀
+
+用户问题：{question}
+"""
+
 
 class LLMClient:
     """Generate answers using OpenAI-compatible chat API."""
@@ -60,3 +76,29 @@ class LLMClient:
             token = chunk.choices[0].delta.content or ""
             if token:
                 yield token
+
+    def rewrite(self, question: str) -> str:
+        """Normalize user question for better retrieval matching.
+
+        Expands abbreviations and check-item names into document-friendly terms.
+        Falls back to original question on any failure.
+        """
+        from src.tiny_rag.config import TERM_MAP, REWRITE_PATTERN
+
+        abbrevs = "\n".join(f"  {k} → {v}" for k, v in TERM_MAP.items())
+        prompt = _REWRITE_PROMPT.format(
+            abbreviations=abbrevs,
+            pattern=REWRITE_PATTERN,
+            question=question,
+        )
+        try:
+            resp = self._client.chat.completions.create(
+                model=self._model,
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.1,
+                max_tokens=128,
+            )
+            rewritten = resp.choices[0].message.content or question
+            return rewritten.strip().strip('"').strip("'")
+        except Exception:
+            return question
