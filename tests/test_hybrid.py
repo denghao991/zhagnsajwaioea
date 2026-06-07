@@ -48,3 +48,26 @@ def test_rrf_merge_respects_n_results():
     bm25 = [_make_result(f"R{i}") for i in range(10)]
     merged = rrf_merge(vec, bm25, n_results=3)
     assert len(merged) == 3
+
+
+def test_rrf_merge_with_weights():
+    """vector 权重 2.0 时排序变化。"""
+    vec = [
+        _make_result("A", distance=0.3),
+        _make_result("B", distance=0.5),
+    ]
+    bm25 = [
+        _make_result("B", distance=0.5),
+        _make_result("C", distance=0.5),
+    ]
+    merged = rrf_merge(vec, bm25, n_results=3, alpha=2.0, beta=1.0)
+    assert [r["text"] for r in merged] == ["B", "A", "C"]
+
+
+def test_rrf_merge_weight_defaults_to_one():
+    """不传 alpha/beta 时与之前行为一致。"""
+    vec = [_make_result("A"), _make_result("B")]
+    bm25 = [_make_result("B"), _make_result("C")]
+    default = rrf_merge(vec, bm25, n_results=3)
+    explicit = rrf_merge(vec, bm25, n_results=3, alpha=1.0, beta=1.0)
+    assert [r["text"] for r in default] == [r["text"] for r in explicit]

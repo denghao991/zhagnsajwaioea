@@ -7,6 +7,8 @@ def rrf_merge(
     vector_results: list[dict],
     bm25_results: list[dict],
     n_results: int = 5,
+    alpha: float = 1.0,
+    beta: float = 1.0,
 ) -> list[dict]:
     """Merge two ranked result lists by Reciprocal Rank Fusion.
 
@@ -14,6 +16,8 @@ def rrf_merge(
         vector_results: Results from vector search (must have 'text' key).
         bm25_results: Results from BM25 search (must have 'text' key).
         n_results: Number of top results to return.
+        alpha: Weight multiplier for vector result ranks.
+        beta: Weight multiplier for BM25 result ranks.
 
     Returns:
         Merged and sorted result list (text-deduplicated), preferring
@@ -25,13 +29,13 @@ def rrf_merge(
 
     for rank, result in enumerate(vector_results, start=1):
         text: str = result["text"]
-        scores[text] = scores.get(text, 0.0) + 1.0 / (_K + rank)
+        scores[text] = scores.get(text, 0.0) + alpha / (_K + rank)
         if text not in best_result:
             best_result[text] = result
 
     for rank, result in enumerate(bm25_results, start=1):
         text = result["text"]
-        scores[text] = scores.get(text, 0.0) + 1.0 / (_K + rank)
+        scores[text] = scores.get(text, 0.0) + beta / (_K + rank)
         if text not in best_result:
             best_result[text] = result
 
