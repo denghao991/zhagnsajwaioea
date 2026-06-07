@@ -69,13 +69,15 @@ REWRITE_EXAMPLES: list[dict[str, str]] = [
 _CONFIG_PATH = _PROJECT_ROOT / "data" / "config.yaml"
 VECTOR_N: int = 12
 BM25_N: int = 4
+VECTOR_ALPHA: float = 1.0
+BM25_BETA: float = 1.0
 CACHE_THRESHOLD: float = 0.03
 CACHE_MAX_ENTRIES: int = 500
 
 
 def _reload_config() -> None:
     """从 data/config.yaml 加载 term_map、检索和缓存参数，文件不存在时使用默认值。"""
-    global TERM_MAP, VECTOR_N, BM25_N, CACHE_THRESHOLD, CACHE_MAX_ENTRIES
+    global TERM_MAP, VECTOR_N, BM25_N, CACHE_THRESHOLD, CACHE_MAX_ENTRIES, VECTOR_ALPHA, BM25_BETA
     if not _CONFIG_PATH.exists():
         return
     with open(_CONFIG_PATH, encoding="utf-8") as _f:
@@ -89,6 +91,8 @@ def _reload_config() -> None:
     retrieval = cfg.get("retrieval", {})
     VECTOR_N = retrieval.get("vector_n", 12)
     BM25_N = retrieval.get("bm25_n", 4)
+    VECTOR_ALPHA = retrieval.get("alpha", 1.0)
+    BM25_BETA = retrieval.get("beta", 1.0)
 
     cache_cfg = cfg.get("cache", {})
     CACHE_THRESHOLD = cache_cfg.get("threshold", 0.03)

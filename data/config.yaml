@@ -7,6 +7,8 @@ cache:
 retrieval:
   vector_n: 12
   bm25_n: 4
+  alpha: 1.0
+  beta: 1.0
 
 # 缩写 → 全称映射（查询改写用）
 term_map:
