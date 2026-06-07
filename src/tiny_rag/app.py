@@ -9,7 +9,7 @@ from pathlib import Path
 from flask import (Flask, Response, jsonify, request, render_template,
                    stream_with_context)
 
-from src.tiny_rag.config import (settings, VECTOR_N, BM25_N,
+from src.tiny_rag.config import (settings, VECTOR_N, BM25_N, VECTOR_ALPHA, BM25_BETA,
                                   CACHE_THRESHOLD, CACHE_MAX_ENTRIES)
 from src.tiny_rag.ingestion.loader import load_bytes, load_pdf
 from src.tiny_rag.ingestion.chunker import MarkdownChunker
@@ -196,7 +196,8 @@ def ask():
     vector_texts = {r["text"] for r in vector_results}
     bm25_texts = {r["text"] for r in bm25_results}
 
-    results = rrf_merge(vector_results, bm25_results, n_results=10)
+    results = rrf_merge(vector_results, bm25_results, n_results=10,
+                        alpha=VECTOR_ALPHA, beta=BM25_BETA)
     if results and settings.rerank_llm_api_key:
         results = reranker.rerank(question, results, top_n=5)
     elif results:
