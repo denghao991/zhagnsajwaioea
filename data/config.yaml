@@ -1,0 +1,10 @@
+# 检索配置
+retrieval:
+  vector_n: 12
+  bm25_n: 4
+
+# 缩写 → 全称映射（查询改写用）
+term_map:
+  OA: 优化顾问(OA)
+  CSS: 云服务CSS
+  CCE: 云容器引擎CCE

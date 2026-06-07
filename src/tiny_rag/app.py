@@ -9,7 +9,7 @@ from pathlib import Path
 from flask import (Flask, Response, jsonify, request, render_template,
                    stream_with_context)
 
-from src.tiny_rag.config import settings
+from src.tiny_rag.config import settings, VECTOR_N, BM25_N
 from src.tiny_rag.ingestion.loader import load_bytes, load_pdf
 from src.tiny_rag.ingestion.chunker import MarkdownChunker
 from src.tiny_rag.ingestion.web_loader import WebLoader
@@ -141,8 +141,6 @@ def ask():
 
     question = body["question"]
     force_refresh = body.get("force_refresh", False)
-    vector_n = body.get("vector_n", 12)
-    bm25_n = body.get("bm25_n", 4)
     _t0 = time.time()
 
     # ── 查询改写 ──
@@ -161,8 +159,8 @@ def ask():
                 "rewritten": rewritten,
                 "cache_hit": True,
                 "latency_ms": round((time.time() - _t0) * 1000),
-                "vector_n": vector_n,
-                "bm25_n": bm25_n,
+                "vector_n": VECTOR_N,
+                "bm25_n": BM25_N,
                 "vector_raw": 0,
                 "bm25_raw": 0,
                 "final_count": 0,
@@ -192,9 +190,9 @@ def ask():
 
     # ── 正常检索 + LLM 流程 ──
     # ── 双路检索 + RRF 合并 ──
-    # 权重由请求体 vector_n/bm25_n 动态控制，默认 12/4
-    vector_results = vector_store.search(question_vec, n_results=vector_n)
-    bm25_results = bm25_retriever.search(question, n_results=bm25_n)
+    # 权重从 data/config.yaml 加载，默认 12/4
+    vector_results = vector_store.search(question_vec, n_results=VECTOR_N)
+    bm25_results = bm25_retriever.search(question, n_results=BM25_N)
 
     # 记录两侧的文本集合，用于后续判断最终结果的来源分布
     vector_texts = {r["text"] for r in vector_results}
@@ -267,8 +265,8 @@ def ask():
             "rewritten": rewritten,
             "cache_hit": False,
             "latency_ms": round((time.time() - _t0) * 1000),
-            "vector_n": vector_n,
-            "bm25_n": bm25_n,
+            "vector_n": VECTOR_N,
+            "bm25_n": BM25_N,
             "vector_raw": len(vector_results),
             "bm25_raw": len(bm25_results),
             "final_count": len(results),

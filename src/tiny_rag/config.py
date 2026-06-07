@@ -66,9 +66,27 @@ REWRITE_EXAMPLES: list[dict[str, str]] = [
 ]
 
 # 如果外部 YAML 文件存在则覆盖（热加载）
-_TERM_MAP_PATH = _PROJECT_ROOT / "data" / "term_map.yaml"
-if _TERM_MAP_PATH.exists():
-    with open(_TERM_MAP_PATH, encoding="utf-8") as _f:
-        _loaded = yaml.safe_load(_f)
-        if isinstance(_loaded, dict) and _loaded:
-            TERM_MAP = _loaded
+_CONFIG_PATH = _PROJECT_ROOT / "data" / "config.yaml"
+VECTOR_N: int = 12
+BM25_N: int = 4
+
+
+def _reload_config() -> None:
+    """从 data/config.yaml 加载 term_map 和检索参数，文件不存在时使用默认值。"""
+    global TERM_MAP, VECTOR_N, BM25_N
+    if not _CONFIG_PATH.exists():
+        return
+    with open(_CONFIG_PATH, encoding="utf-8") as _f:
+        cfg = yaml.safe_load(_f) or {}
+
+    term_map = cfg.get("term_map", {})
+    if isinstance(term_map, dict) and term_map:
+        TERM_MAP.clear()
+        TERM_MAP.update(term_map)
+
+    retrieval = cfg.get("retrieval", {})
+    VECTOR_N = retrieval.get("vector_n", 12)
+    BM25_N = retrieval.get("bm25_n", 4)
+
+
+_reload_config()

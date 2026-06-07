@@ -246,20 +246,3 @@ def test_ask_sse_metadata(client):
     assert done_data.get("rewritten") == "test query"
     assert done_data.get("cached") is False
 
-
-def test_ask_with_custom_weights(client):
-    """/ask 请求体传 vector_n/bm25_n 应接受并正常处理。"""
-    from unittest.mock import patch
-
-    with (
-        patch("src.tiny_rag.app.embedder.embed", return_value=[[0.1] * 768, [0.1] * 768]),
-        patch("src.tiny_rag.app.vector_store.search", return_value=[
-            {"text": "chunk", "doc_id": "doc1", "filename": "test.txt", "chunk_index": 0},
-        ]),
-        patch("src.tiny_rag.app.bm25_retriever.search", return_value=[]),
-        patch("src.tiny_rag.app.llm.rewrite", return_value="test query"),
-        patch("src.tiny_rag.app.llm.generate_stream", return_value=iter(["answer"])),
-    ):
-        resp = client.post("/ask", json={"question": "test", "vector_n": 8, "bm25_n": 2})
-
-    assert resp.status_code == 200
