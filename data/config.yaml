@@ -1,3 +1,8 @@
+# 语义缓存
+cache:
+  threshold: 0.03
+  max_entries: 500
+
 # 检索配置
 retrieval:
   vector_n: 12

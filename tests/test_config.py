@@ -34,3 +34,15 @@ class TestRewritePattern:
 
     def test_rewrite_pattern_contains_example(self):
         assert "CSS" in REWRITE_PATTERN or "云服务" in REWRITE_PATTERN
+
+
+class TestCacheConfig:
+    def test_cache_threshold_default(self):
+        from src.tiny_rag.config import CACHE_THRESHOLD
+        assert isinstance(CACHE_THRESHOLD, float)
+        assert 0 < CACHE_THRESHOLD < 1
+
+    def test_cache_max_entries_default(self):
+        from src.tiny_rag.config import CACHE_MAX_ENTRIES
+        assert isinstance(CACHE_MAX_ENTRIES, int)
+        assert CACHE_MAX_ENTRIES > 0

@@ -9,7 +9,8 @@ from pathlib import Path
 from flask import (Flask, Response, jsonify, request, render_template,
                    stream_with_context)
 
-from src.tiny_rag.config import settings, VECTOR_N, BM25_N
+from src.tiny_rag.config import (settings, VECTOR_N, BM25_N,
+                                  CACHE_THRESHOLD, CACHE_MAX_ENTRIES)
 from src.tiny_rag.ingestion.loader import load_bytes, load_pdf
 from src.tiny_rag.ingestion.chunker import MarkdownChunker
 from src.tiny_rag.ingestion.web_loader import WebLoader
@@ -33,7 +34,11 @@ embedder = EmbeddingClient(
 
 vector_store = VectorStore(persist_dir=settings.chroma_persist_dir)
 
-cache = SemanticCache(persist_dir=settings.chroma_persist_dir)
+cache = SemanticCache(
+    persist_dir=settings.chroma_persist_dir,
+    threshold=CACHE_THRESHOLD,
+    max_entries=CACHE_MAX_ENTRIES,
+)
 
 llm = LLMClient(
     base_url=settings.llm_base_url,
@@ -146,14 +151,12 @@ def ask():
     # ── 查询改写 ──
     rewritten = llm.rewrite(question)
 
-    # 同时嵌入原始问题和改写结果，节省一次 API 调用
-    _orig_vec, question_vec = embedder.embed([question, rewritten])
+    question_vec = embedder.embed([rewritten])[0]
 
     # ── 语义缓存检查 ──
     if not force_refresh:
         cached = cache.search(query_embedding=question_vec)
-        if cached and not cached["poisoned"]:
-            cache.hits += 1
+        if cached:
             query_log.log_query({
                 "original_question": question,
                 "rewritten": rewritten,
@@ -182,11 +185,6 @@ def ask():
                 mimetype="text/event-stream",
                 headers={"Cache-Control": "no-cache"},
             )
-        elif cached and cached["poisoned"]:
-            cache.poisoned_skips += 1
-        else:
-            cache.misses += 1
-            cache.record_miss(question)
 
     # ── 正常检索 + LLM 流程 ──
     # ── 双路检索 + RRF 合并 ──
@@ -226,13 +224,7 @@ def ask():
     source_info = [{"id": doc_id, "name": name} for doc_id, name in seen.items()]
     context = "\n\n".join(r["text"] for r in results)
 
-    # 确定 entry_id（force_refresh 时复用已有缓存条目）
-    if force_refresh:
-        cache.force_refreshes += 1
-        found_entry_id = cache.get_entry_id(embedding=question_vec)
-        entry_id = found_entry_id if found_entry_id else f"cache_{uuid.uuid4().hex[:12]}"
-    else:
-        entry_id = f"cache_{uuid.uuid4().hex[:12]}"
+    entry_id = f"cache_{uuid.uuid4().hex[:12]}"
 
     answer_buffer: list[str] = []
 
@@ -255,11 +247,7 @@ def ask():
             entry_id=entry_id,
         )
 
-        # 4. force_refresh 时更新 refresh_count
-        if force_refresh:
-            cache.mark_refreshed(entry_id)
-
-        # 5. 记录日志
+        # 4. 记录日志
         query_log.log_query({
             "original_question": question,
             "rewritten": rewritten,

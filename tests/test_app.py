@@ -40,7 +40,7 @@ def test_stats_returns_counters(client):
     assert resp.status_code == 200
     data = resp.get_json()
     assert data is not None
-    for key in ("hits", "misses", "total_requests", "hit_rate", "cache_entries", "force_refreshes", "poisoned_skips", "recent_misses"):
+    for key in ("hits", "misses", "total_requests", "hit_rate", "cache_entries", "threshold", "max_entries"):
         assert key in data
 
 
@@ -130,7 +130,7 @@ def test_ask_invokes_rerank_when_configured(client):
     settings.rerank_llm_api_key = "sk-test"
     try:
         with (
-            patch("src.tiny_rag.app.embedder.embed", return_value=[[0.1] * 768, [0.1] * 768]),
+            patch("src.tiny_rag.app.embedder.embed", return_value=[[0.1] * 768]),
             patch("src.tiny_rag.app.vector_store.search", return_value=mock_docs),
             patch("src.tiny_rag.app.bm25_retriever.search", return_value=[]),
             patch("src.tiny_rag.app.llm.rewrite", return_value="test query"),
@@ -162,7 +162,7 @@ def test_ask_skips_rerank_when_key_empty(client):
     settings.rerank_llm_api_key = ""
     try:
         with (
-            patch("src.tiny_rag.app.embedder.embed", return_value=[[0.1] * 768, [0.1] * 768]),
+            patch("src.tiny_rag.app.embedder.embed", return_value=[[0.1] * 768]),
             patch("src.tiny_rag.app.vector_store.search", return_value=mock_docs),
             patch("src.tiny_rag.app.bm25_retriever.search", return_value=[]),
             patch("src.tiny_rag.app.llm.rewrite", return_value="test query"),
@@ -194,7 +194,7 @@ def test_upload_web_success(client):
         patch("src.tiny_rag.app.web_loader.load", return_value=[
             PageResult(url="https://wiki.example.com/page", markdown="# Hello\n\nWorld", depth=0),
         ]),
-        patch("src.tiny_rag.app.embedder.embed", return_value=[[0.1] * 768, [0.1] * 768]),
+        patch("src.tiny_rag.app.embedder.embed", return_value=[[0.1] * 768]),
         patch("src.tiny_rag.app.vector_store.add_document"),
         patch("src.tiny_rag.app.bm25_retriever.add_document"),
         patch("src.tiny_rag.app.cache.clear"),
@@ -225,7 +225,7 @@ def test_ask_sse_metadata(client):
     from unittest.mock import patch
 
     with (
-        patch("src.tiny_rag.app.embedder.embed", return_value=[[0.1] * 768, [0.1] * 768]),
+        patch("src.tiny_rag.app.embedder.embed", return_value=[[0.1] * 768]),
         patch("src.tiny_rag.app.vector_store.search", return_value=[
             {"text": "chunk", "doc_id": "doc1", "filename": "test.txt", "chunk_index": 0},
         ]),
