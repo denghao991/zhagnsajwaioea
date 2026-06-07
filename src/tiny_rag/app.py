@@ -56,6 +56,9 @@ chunker = MarkdownChunker(
 
 web_loader = WebLoader(max_depth=20)
 
+from src.tiny_rag.query_log import QueryLog
+query_log = QueryLog()
+
 
 @app.route("/")
 def index():
@@ -140,17 +143,33 @@ def ask():
     force_refresh = body.get("force_refresh", False)
     vector_n = body.get("vector_n", 12)
     bm25_n = body.get("bm25_n", 4)
+    _t0 = time.time()
 
     # ── 查询改写 ──
     rewritten = llm.rewrite(question)
 
-    question_vec = embedder.embed([rewritten])[0]
+    # 同时嵌入原始问题和改写结果，节省一次 API 调用
+    _orig_vec, question_vec = embedder.embed([question, rewritten])
 
     # ── 语义缓存检查 ──
     if not force_refresh:
         cached = cache.search(query_embedding=question_vec)
         if cached and not cached["poisoned"]:
             cache.hits += 1
+            query_log.log_query({
+                "original_question": question,
+                "rewritten": rewritten,
+                "cache_hit": True,
+                "latency_ms": round((time.time() - _t0) * 1000),
+                "vector_n": vector_n,
+                "bm25_n": bm25_n,
+                "vector_raw": 0,
+                "bm25_raw": 0,
+                "final_count": 0,
+                "src_vector": 0,
+                "src_bm25": 0,
+                "src_both": 0,
+            })
 
             def generate_cached():
                 yield f"event: context\ndata: {json.dumps(cached['sources'])}\n\n"
@@ -176,11 +195,28 @@ def ask():
     # 权重由请求体 vector_n/bm25_n 动态控制，默认 12/4
     vector_results = vector_store.search(question_vec, n_results=vector_n)
     bm25_results = bm25_retriever.search(question, n_results=bm25_n)
+
+    # 记录两侧的文本集合，用于后续判断最终结果的来源分布
+    vector_texts = {r["text"] for r in vector_results}
+    bm25_texts = {r["text"] for r in bm25_results}
+
     results = rrf_merge(vector_results, bm25_results, n_results=10)
     if results and settings.rerank_llm_api_key:
         results = reranker.rerank(question, results, top_n=5)
     elif results:
         results = results[:5]
+
+    # 最终结果的来源分布
+    source_dist = {"vector": 0, "bm25": 0, "both": 0}
+    for r in results:
+        in_v = r["text"] in vector_texts
+        in_b = r["text"] in bm25_texts
+        if in_v and in_b:
+            source_dist["both"] += 1
+        elif in_v:
+            source_dist["vector"] += 1
+        elif in_b:
+            source_dist["bm25"] += 1
 
     if not results:
         return jsonify({"answer": "未找到相关文档，请先上传文档。", "sources": []})
@@ -225,7 +261,23 @@ def ask():
         if force_refresh:
             cache.mark_refreshed(entry_id)
 
-        # 5. 结束事件
+        # 5. 记录日志
+        query_log.log_query({
+            "original_question": question,
+            "rewritten": rewritten,
+            "cache_hit": False,
+            "latency_ms": round((time.time() - _t0) * 1000),
+            "vector_n": vector_n,
+            "bm25_n": bm25_n,
+            "vector_raw": len(vector_results),
+            "bm25_raw": len(bm25_results),
+            "final_count": len(results),
+            "src_vector": source_dist["vector"],
+            "src_bm25": source_dist["bm25"],
+            "src_both": source_dist["both"],
+        })
+
+        # 6. 结束事件
         yield f"event: done\ndata: {json.dumps({'sources': source_info, 'cached': False, 'original_question': question, 'rewritten': rewritten})}\n\n"
 
     return Response(
