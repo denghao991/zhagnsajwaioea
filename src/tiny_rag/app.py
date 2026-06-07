@@ -1,7 +1,9 @@
 """Flask application — RAG system web server."""
 
 import json
+import time
 import uuid
+from datetime import datetime, timezone
 from pathlib import Path
 
 from flask import (Flask, Response, jsonify, request, render_template,
@@ -136,15 +138,17 @@ def ask():
 
     question = body["question"]
     force_refresh = body.get("force_refresh", False)
+    vector_n = body.get("vector_n", 12)
+    bm25_n = body.get("bm25_n", 4)
 
     # ── 查询改写 ──
     rewritten = llm.rewrite(question)
 
-    question_embedding = embedder.embed([rewritten])[0]
+    question_vec = embedder.embed([rewritten])[0]
 
     # ── 语义缓存检查 ──
     if not force_refresh:
-        cached = cache.search(query_embedding=question_embedding)
+        cached = cache.search(query_embedding=question_vec)
         if cached and not cached["poisoned"]:
             cache.hits += 1
 
@@ -154,7 +158,7 @@ def ask():
                 segments = [answer[i:i+3] for i in range(0, len(answer), 3)]
                 for seg in segments:
                     yield f"event: token\ndata: {json.dumps(seg)}\n\n"
-                yield f"event: done\ndata: {json.dumps({'cached': True})}\n\n"
+                yield f"event: done\ndata: {json.dumps({'cached': True, 'original_question': question, 'rewritten': rewritten})}\n\n"
 
             return Response(
                 stream_with_context(generate_cached()),
@@ -169,9 +173,9 @@ def ask():
 
     # ── 正常检索 + LLM 流程 ──
     # ── 双路检索 + RRF 合并 ──
-    # n_results=10 on RRF: pass all unique candidates (max 10) to reranker for re-ranking
-    vector_results = vector_store.search(question_embedding, n_results=5)
-    bm25_results = bm25_retriever.search(question, n_results=5)
+    # 权重由请求体 vector_n/bm25_n 动态控制，默认 12/4
+    vector_results = vector_store.search(question_vec, n_results=vector_n)
+    bm25_results = bm25_retriever.search(question, n_results=bm25_n)
     results = rrf_merge(vector_results, bm25_results, n_results=10)
     if results and settings.rerank_llm_api_key:
         results = reranker.rerank(question, results, top_n=5)
@@ -191,7 +195,7 @@ def ask():
     # 确定 entry_id（force_refresh 时复用已有缓存条目）
     if force_refresh:
         cache.force_refreshes += 1
-        found_entry_id = cache.get_entry_id(embedding=question_embedding)
+        found_entry_id = cache.get_entry_id(embedding=question_vec)
         entry_id = found_entry_id if found_entry_id else f"cache_{uuid.uuid4().hex[:12]}"
     else:
         entry_id = f"cache_{uuid.uuid4().hex[:12]}"
@@ -212,7 +216,7 @@ def ask():
         cache.put(
             question=rewritten,
             answer=full_answer,
-            embedding=question_embedding,
+            embedding=question_vec,
             sources=results,
             entry_id=entry_id,
         )
@@ -222,7 +226,7 @@ def ask():
             cache.mark_refreshed(entry_id)
 
         # 5. 结束事件
-        yield f"event: done\ndata: {json.dumps({'sources': source_info})}\n\n"
+        yield f"event: done\ndata: {json.dumps({'sources': source_info, 'cached': False, 'original_question': question, 'rewritten': rewritten})}\n\n"
 
     return Response(
         stream_with_context(generate_and_cache()),

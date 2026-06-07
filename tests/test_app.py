@@ -218,3 +218,48 @@ def test_upload_web_fetch_fails(client):
 
     assert resp.status_code == 400
     assert "error" in resp.get_json()
+
+
+def test_ask_sse_metadata(client):
+    """SSE done 事件包含 original_question/rewritten/cached。"""
+    from unittest.mock import patch
+
+    with (
+        patch("src.tiny_rag.app.embedder.embed", return_value=[[0.1] * 768]),
+        patch("src.tiny_rag.app.vector_store.search", return_value=[
+            {"text": "chunk", "doc_id": "doc1", "filename": "test.txt", "chunk_index": 0},
+        ]),
+        patch("src.tiny_rag.app.bm25_retriever.search", return_value=[]),
+        patch("src.tiny_rag.app.llm.rewrite", return_value="test query"),
+        patch("src.tiny_rag.app.llm.generate_stream", return_value=iter(["answer"])),
+    ):
+        resp = client.post("/ask", json={"question": "test question"})
+
+    assert resp.status_code == 200
+    body = resp.get_data(as_text=True)
+    assert "event: done" in body
+    # 提取 done 事件的 data 行
+    lines = body.strip().split("\n")
+    done_idx = lines.index("event: done")
+    done_data = json.loads(lines[done_idx + 1].removeprefix("data: "))
+    assert done_data.get("original_question") == "test question"
+    assert done_data.get("rewritten") == "test query"
+    assert done_data.get("cached") is False
+
+
+def test_ask_with_custom_weights(client):
+    """/ask 请求体传 vector_n/bm25_n 应接受并正常处理。"""
+    from unittest.mock import patch
+
+    with (
+        patch("src.tiny_rag.app.embedder.embed", return_value=[[0.1] * 768]),
+        patch("src.tiny_rag.app.vector_store.search", return_value=[
+            {"text": "chunk", "doc_id": "doc1", "filename": "test.txt", "chunk_index": 0},
+        ]),
+        patch("src.tiny_rag.app.bm25_retriever.search", return_value=[]),
+        patch("src.tiny_rag.app.llm.rewrite", return_value="test query"),
+        patch("src.tiny_rag.app.llm.generate_stream", return_value=iter(["answer"])),
+    ):
+        resp = client.post("/ask", json={"question": "test", "vector_n": 8, "bm25_n": 2})
+
+    assert resp.status_code == 200
