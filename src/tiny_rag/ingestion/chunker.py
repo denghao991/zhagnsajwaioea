@@ -36,13 +36,20 @@ def chunk_text(text: str, chunk_size: int, chunk_overlap: int) -> list[str]:
 
 class MarkdownChunker:
     """Markdown-aware chunker that respects heading hierarchy,
-    code blocks, and table boundaries."""
+    code blocks, and table boundaries.
 
-    def __init__(self, chunk_size: int = 512, chunk_overlap: int = 64):
+    Follows LangChain MarkdownHeaderTextSplitter approach:
+    - Split by heading boundaries, no auto-merge
+    - heading_path prepended to text for embedding context
+    - Oversized sections split by paragraph → line → token
+    """
+
+    def __init__(self, chunk_size: int = 512, chunk_overlap: int = 64, strip_headers: bool = False):
         if chunk_overlap >= chunk_size:
             raise ValueError("chunk_overlap must be less than chunk_size")
         self.chunk_size = chunk_size
         self.chunk_overlap = chunk_overlap
+        self.strip_headers = strip_headers
 
     def chunk_text(self, text: str) -> list[ChunkResult]:
         """Chunk markdown text by heading hierarchy.
@@ -140,45 +147,38 @@ class MarkdownChunker:
     # ── Step 3: Size management ─────────────────────────────
 
     def _apply_size_management(self, sections: list[dict]) -> list[ChunkResult]:
-        """Merge small sections, split large sections, apply overlap."""
+        """Keep or split sections. No auto-merge — LangChain-style.
+        Prepends heading_path to text for embedding context."""
         results: list[ChunkResult] = []
 
-        def _chunk(text: str, hp: str) -> ChunkResult:
+        def _make_chunk(text: str, hp: str) -> ChunkResult:
+            if hp:
+                text = f"{hp} > {text}"
             return ChunkResult(
                 text=text, heading_path=hp, token_count=count_tokens(text),
             )
 
-        i = 0
-        while i < len(sections):
-            text = "\n".join(sections[i]["lines"])
+        for section in sections:
+            lines = section["lines"]
+            hp = section["heading_path"]
+
+            # strip_headers: remove heading lines from content
+            if self.strip_headers:
+                lines = [l for l in lines if not re.match(r"^#{1,6}\s+", l)]
+
+            text = "\n".join(lines)
             tokens = count_tokens(text)
-            hp = sections[i]["heading_path"]
 
-            # Small: merge with next, or previous if last
-            if 0 < tokens < 100:
-                if i + 1 < len(sections):
-                    next_text = "\n".join(sections[i + 1]["lines"])
-                    merged_hp = sections[i + 1]["heading_path"]
-                    results.append(_chunk(text + "\n" + next_text, merged_hp))
-                    i += 2
-                    continue
-                elif results:
-                    prev = results.pop()
-                    results.append(_chunk(prev.text + "\n" + text, hp))
-                    i += 1
-                    continue
-                else:
-                    results.append(_chunk(text, hp))
-
-            # Within range: keep
-            elif tokens <= self.chunk_size:
-                results.append(_chunk(text, hp))
-
-            # Too large: split
+            if tokens <= self.chunk_size:
+                results.append(_make_chunk(text, hp))
             else:
-                results.extend(self._split_large(text, hp))
-
-            i += 1
+                # Split first, then prepend heading to each sub-chunk
+                sub_chunks = self._split_large(text, hp)
+                for c in sub_chunks:
+                    if hp:
+                        c.text = f"{hp} > {c.text}"
+                        c.token_count = count_tokens(c.text)
+                results.extend(sub_chunks)
 
         return results
 
