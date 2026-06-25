@@ -50,6 +50,7 @@ REWRITE_PATTERN: str = (
     "用户问题中的检查项名称格式为'云服务名+检查项描述'，属于风险检查模块。"
     "例如'CSS可用区未多AZ'是一个风险检查项，表示\"云服务CSS的可用区是否未配置多AZ\"。"
     "请改写为'{云服务名}{检查项描述}，这个风险检查项是什么意思？'的格式。"
+    "hcso/国际站/即云上的一个region,可以映射为region,指的是支持的范围/在指定region下用户的问题"
 )
 
 # Few-shot 改写示例（团队持续维护）
@@ -69,8 +70,8 @@ REWRITE_EXAMPLES: list[dict[str, str]] = [
 _CONFIG_PATH = _PROJECT_ROOT / "data" / "config.yaml"
 VECTOR_N: int = 12
 BM25_N: int = 4
-VECTOR_ALPHA: float = 1.0
-BM25_BETA: float = 1.0
+VECTOR_ALPHA: float = 7.0
+BM25_BETA: float = 3.0
 CACHE_THRESHOLD: float = 0.03
 CACHE_MAX_ENTRIES: int = 500
 
@@ -91,8 +92,8 @@ def _reload_config() -> None:
     retrieval = cfg.get("retrieval", {})
     VECTOR_N = retrieval.get("vector_n", 12)
     BM25_N = retrieval.get("bm25_n", 4)
-    VECTOR_ALPHA = retrieval.get("alpha", 1.0)
-    BM25_BETA = retrieval.get("beta", 1.0)
+    VECTOR_ALPHA = retrieval.get("alpha", 7.0)
+    BM25_BETA = retrieval.get("beta", 3.0)
 
     cache_cfg = cfg.get("cache", {})
     CACHE_THRESHOLD = cache_cfg.get("threshold", 0.03)

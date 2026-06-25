@@ -1,0 +1,469 @@
+{
+  "model": "text-embedding-v1",
+  "dimensions": "default",
+  "max_input_tokens": 2048,
+  "num_chunks": 32,
+  "num_questions": 14,
+  "recall": {
+    "1": 0.7857,
+    "3": 0.9286,
+    "5": 0.9286,
+    "10": 1.0,
+    "20": 1.0
+  },
+  "mrr": 0.8542,
+  "truncated_chars": 0,
+  "latency": {
+    "p50": 0.47,
+    "p95": 0.91,
+    "p99": 0.95,
+    "per_req_p50": 0.0469,
+    "per_req_p95": 0.0906,
+    "total_seconds": 2.24
+  },
+  "cost": {
+    "total_usd": 6e-06,
+    "price_per_million_tokens": 0.0007,
+    "input_tokens": 8457
+  },
+  "per_question": [
+    {
+      "question": "OA有哪些功能",
+      "rewritten": "优化顾问(OA)有哪些功能",
+      "expected": [
+        "产品介绍#0",
+        "产品介绍#1"
+      ],
+      "first_rank": 2,
+      "reciprocal_rank": 0.5,
+      "top_5": [
+        {
+          "chunk_id": "服务#0",
+          "score": 0.7638
+        },
+        {
+          "chunk_id": "产品介绍#0",
+          "score": 0.5971
+        },
+        {
+          "chunk_id": "覆盖范围#0",
+          "score": 0.5959
+        },
+        {
+          "chunk_id": "风险检查概述#1",
+          "score": 0.5299
+        },
+        {
+          "chunk_id": "国际站可用性检查与 Token 问题补充#2",
+          "score": 0.4986
+        }
+      ]
+    },
+    {
+      "question": "OA应用场景是什么",
+      "rewritten": "优化顾问(OA)应用场景是什么",
+      "expected": [
+        "服务#1"
+      ],
+      "first_rank": 8,
+      "reciprocal_rank": 0.125,
+      "top_5": [
+        {
+          "chunk_id": "服务#0",
+          "score": 0.7444
+        },
+        {
+          "chunk_id": "覆盖范围#0",
+          "score": 0.593
+        },
+        {
+          "chunk_id": "产品介绍#0",
+          "score": 0.5447
+        },
+        {
+          "chunk_id": "风险检查概述#1",
+          "score": 0.4918
+        },
+        {
+          "chunk_id": "国际站可用性检查与 Token 问题补充#2",
+          "score": 0.449
+        }
+      ]
+    },
+    {
+      "question": "风险检查为什么一直不执行，进度0%",
+      "rewritten": "风险检查任务为什么一直",
+      "expected": [
+        "风险检查#1"
+      ],
+      "first_rank": 1,
+      "reciprocal_rank": 1.0,
+      "top_5": [
+        {
+          "chunk_id": "风险检查#1",
+          "score": 0.6795
+        },
+        {
+          "chunk_id": "风险检查#0",
+          "score": 0.6628
+        },
+        {
+          "chunk_id": "功能说明#0",
+          "score": 0.543
+        },
+        {
+          "chunk_id": "可用性检查故障排查#1",
+          "score": 0.4886
+        },
+        {
+          "chunk_id": "风险检查概述#0",
+          "score": 0.4792
+        }
+      ]
+    },
+    {
+      "question": "风险检查支持哪几种类型",
+      "rewritten": "风险检查支持哪几种类型",
+      "expected": [
+        "风险检查概述#0",
+        "风险检查#0"
+      ],
+      "first_rank": 1,
+      "reciprocal_rank": 1.0,
+      "top_5": [
+        {
+          "chunk_id": "风险检查#0",
+          "score": 0.7507
+        },
+        {
+          "chunk_id": "功能说明#0",
+          "score": 0.6615
+        },
+        {
+          "chunk_id": "风险检查#1",
+          "score": 0.6431
+        },
+        {
+          "chunk_id": "覆盖范围#0",
+          "score": 0.5645
+        },
+        {
+          "chunk_id": "风险检查概述#0",
+          "score": 0.5436
+        }
+      ]
+    },
+    {
+      "question": "OA监控消息，我手机收不到告警短信，是不是咱们OA后台把我的手机号给拦截了？帮忙看一下。",
+      "rewritten": "OA监控消息，我手机收不到告警短信，是不是咱们OA后台把我的手机号给拦截了？帮忙看一下。",
+      "expected": [
+        "监控告警与通知机制说明#1"
+      ],
+      "first_rank": 1,
+      "reciprocal_rank": 1.0,
+      "top_5": [
+        {
+          "chunk_id": "监控告警与通知机制说明#1",
+          "score": 0.8394
+        },
+        {
+          "chunk_id": "监控告警与通知机制说明#0",
+          "score": 0.5934
+        },
+        {
+          "chunk_id": "资源数据同步与专线问题#2",
+          "score": 0.5412
+        },
+        {
+          "chunk_id": "国际站可用性检查与 Token 问题补充#1",
+          "score": 0.4477
+        },
+        {
+          "chunk_id": "资源数据同步与专线问题#1",
+          "score": 0.4408
+        }
+      ]
+    },
+    {
+      "question": "OA容量优化任务失败，只有一部分结果。",
+      "rewritten": "优化顾问(OA)容量优化任务失败，只有一部分结果。",
+      "expected": [
+        "容量优化任务常见问题#0"
+      ],
+      "first_rank": 1,
+      "reciprocal_rank": 1.0,
+      "top_5": [
+        {
+          "chunk_id": "容量优化任务常见问题#0",
+          "score": 0.7704
+        },
+        {
+          "chunk_id": "容量优化误区#0",
+          "score": 0.758
+        },
+        {
+          "chunk_id": "容量优化误区#2",
+          "score": 0.6563
+        },
+        {
+          "chunk_id": "容量优化任务常见问题#1",
+          "score": 0.6366
+        },
+        {
+          "chunk_id": "容量优化误区#1",
+          "score": 0.6268
+        }
+      ]
+    },
+    {
+      "question": "谁可以帮忙解答一下？在导出可用性检查时报错，The token don't have much.",
+      "rewritten": "谁可以帮忙解答一下？在导出可用性检查时报错，The token don't have much.",
+      "expected": [
+        "国际站可用性检查与 Token 问题补充#1",
+        "可用性检查故障排查#2"
+      ],
+      "first_rank": 1,
+      "reciprocal_rank": 1.0,
+      "top_5": [
+        {
+          "chunk_id": "可用性检查故障排查#2",
+          "score": 0.8579
+        },
+        {
+          "chunk_id": "容量优化任务常见问题#2",
+          "score": 0.809
+        },
+        {
+          "chunk_id": "国际站可用性检查与 Token 问题补充#1",
+          "score": 0.7077
+        },
+        {
+          "chunk_id": "容量优化误区#3",
+          "score": 0.6639
+        },
+        {
+          "chunk_id": "可用性检查故障排查#1",
+          "score": 0.5722
+        }
+      ]
+    },
+    {
+      "question": "可用性检查不支持h c s o吗？",
+      "rewritten": "可用性检查不支持h c s o吗？",
+      "expected": [
+        "可用性检查故障排查#0"
+      ],
+      "first_rank": 1,
+      "reciprocal_rank": 1.0,
+      "top_5": [
+        {
+          "chunk_id": "可用性检查故障排查#0",
+          "score": 0.7205
+        },
+        {
+          "chunk_id": "可用性检查故障排查#1",
+          "score": 0.4769
+        },
+        {
+          "chunk_id": "国际站可用性检查与 Token 问题补充#0",
+          "score": 0.4084
+        },
+        {
+          "chunk_id": "可用性检查故障排查#2",
+          "score": 0.4048
+        },
+        {
+          "chunk_id": "风险检查#0",
+          "score": 0.3844
+        }
+      ]
+    },
+    {
+      "question": "OA服务器检查问题，检查到了内存高风险服务器。然后我咨询ECS那边，说ECS已经迁移走了。这个是因为OA中物理机的数据没有更新吗？",
+      "rewritten": "OA服务器检查问题，检查到了内存高风险服务器。然后我咨询ECS那边，说ECS已经迁移走了。这个是因为OA中物理机的数据没有更新吗？",
+      "expected": [
+        "资源数据同步与专线问题#0"
+      ],
+      "first_rank": 1,
+      "reciprocal_rank": 1.0,
+      "top_5": [
+        {
+          "chunk_id": "资源数据同步与专线问题#0",
+          "score": 0.7894
+        },
+        {
+          "chunk_id": "国际站可用性检查与 Token 问题补充#2",
+          "score": 0.6125
+        },
+        {
+          "chunk_id": "资源数据同步与专线问题#2",
+          "score": 0.5874
+        },
+        {
+          "chunk_id": "资源数据同步与专线问题#1",
+          "score": 0.5716
+        },
+        {
+          "chunk_id": "风险检查#1",
+          "score": 0.5528
+        }
+      ]
+    },
+    {
+      "question": "OBS服务，OA的数据源来源是哪里？CMC吗？",
+      "rewritten": "OBS服务，OA的数据源来源是哪里？CMC吗？",
+      "expected": [
+        "资源数据同步与专线问题#1"
+      ],
+      "first_rank": 1,
+      "reciprocal_rank": 1.0,
+      "top_5": [
+        {
+          "chunk_id": "资源数据同步与专线问题#1",
+          "score": 0.7956
+        },
+        {
+          "chunk_id": "容量优化任务常见问题#1",
+          "score": 0.5204
+        },
+        {
+          "chunk_id": "资源数据同步与专线问题#2",
+          "score": 0.5183
+        },
+        {
+          "chunk_id": "资源数据同步与专线问题#0",
+          "score": 0.4758
+        },
+        {
+          "chunk_id": "风险检查概述#1",
+          "score": 0.4573
+        }
+      ]
+    },
+    {
+      "question": "HCSO OA专线这里没有数据是什么原因？",
+      "rewritten": "HCSO OA专线这里没有数据是什么原因？",
+      "expected": [
+        "资源数据同步与专线问题#2"
+      ],
+      "first_rank": 1,
+      "reciprocal_rank": 1.0,
+      "top_5": [
+        {
+          "chunk_id": "资源数据同步与专线问题#2",
+          "score": 0.7588
+        },
+        {
+          "chunk_id": "资源数据同步与专线问题#1",
+          "score": 0.5402
+        },
+        {
+          "chunk_id": "国际站可用性检查与 Token 问题补充#2",
+          "score": 0.5002
+        },
+        {
+          "chunk_id": "可用性检查故障排查#0",
+          "score": 0.4883
+        },
+        {
+          "chunk_id": "监控告警与通知机制说明#1",
+          "score": 0.4593
+        }
+      ]
+    },
+    {
+      "question": "OA上监控配置完成之后，是多长时间会触发监控告警？我们这边配置了一个一定会触发的告警规则，可是等了一会，也没有相应的告警。",
+      "rewritten": "OA上监控配置完成之后，是多长时间会触发监控告警？我们这边配置了一个一定会触发的告警规则，可是等了一会，也没有相应的告警。",
+      "expected": [
+        "监控告警与通知机制说明#0"
+      ],
+      "first_rank": 1,
+      "reciprocal_rank": 1.0,
+      "top_5": [
+        {
+          "chunk_id": "监控告警与通知机制说明#0",
+          "score": 0.8202
+        },
+        {
+          "chunk_id": "监控告警与通知机制说明#1",
+          "score": 0.6332
+        },
+        {
+          "chunk_id": "容量优化#1",
+          "score": 0.5353
+        },
+        {
+          "chunk_id": "资源数据同步与专线问题#0",
+          "score": 0.5135
+        },
+        {
+          "chunk_id": "资源数据同步与专线问题#1",
+          "score": 0.5132
+        }
+      ]
+    },
+    {
+      "question": "查询不到EVS的资源了，这个谁来帮忙看一下？",
+      "rewritten": "查询不到EVS的资源了，这个谁来帮忙看一下？",
+      "expected": [
+        "资源数据同步与专线问题#3"
+      ],
+      "first_rank": 1,
+      "reciprocal_rank": 1.0,
+      "top_5": [
+        {
+          "chunk_id": "资源数据同步与专线问题#3",
+          "score": 0.7775
+        },
+        {
+          "chunk_id": "国际站可用性检查与 Token 问题补充#2",
+          "score": 0.5659
+        },
+        {
+          "chunk_id": "可用性检查故障排查#1",
+          "score": 0.4593
+        },
+        {
+          "chunk_id": "容量优化任务常见问题#0",
+          "score": 0.4038
+        },
+        {
+          "chunk_id": "容量优化误区#1",
+          "score": 0.3948
+        }
+      ]
+    },
+    {
+      "question": "国际站这个可用性检查卡在99%有20分钟了，谁能帮忙看一下？",
+      "rewritten": "国际站这个可用性检查卡在99%有20分钟了，谁能帮忙看一下？",
+      "expected": [
+        "可用性检查故障排查#1",
+        "风险检查#1"
+      ],
+      "first_rank": 3,
+      "reciprocal_rank": 0.3333333333333333,
+      "top_5": [
+        {
+          "chunk_id": "国际站可用性检查与 Token 问题补充#0",
+          "score": 0.7195
+        },
+        {
+          "chunk_id": "国际站可用性检查与 Token 问题补充#2",
+          "score": 0.6428
+        },
+        {
+          "chunk_id": "可用性检查故障排查#1",
+          "score": 0.6371
+        },
+        {
+          "chunk_id": "国际站可用性检查与 Token 问题补充#1",
+          "score": 0.5155
+        },
+        {
+          "chunk_id": "风险检查#1",
+          "score": 0.4654
+        }
+      ]
+    }
+  ]
+}

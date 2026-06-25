@@ -11,7 +11,7 @@ from flask import (Flask, Response, jsonify, request, render_template,
 
 from src.tiny_rag.config import (settings, VECTOR_N, BM25_N, VECTOR_ALPHA, BM25_BETA,
                                   CACHE_THRESHOLD, CACHE_MAX_ENTRIES)
-from src.tiny_rag.ingestion.loader import load_bytes, load_pdf
+from src.tiny_rag.ingestion.loader import load_bytes
 from src.tiny_rag.ingestion.chunker import MarkdownChunker
 from src.tiny_rag.ingestion.web_loader import WebLoader
 from src.tiny_rag.embedding.client import EmbeddingClient
@@ -22,7 +22,7 @@ from src.tiny_rag.retrieval.bm25 import BM25Retriever
 from src.tiny_rag.retrieval.hybrid import rrf_merge
 from src.tiny_rag.retrieval.reranker import RerankClient
 
-ALLOWED_EXTENSIONS = {".txt", ".md", ".pdf"}
+ALLOWED_EXTENSIONS = {".md"}
 
 app = Flask(__name__)
 
@@ -81,18 +81,12 @@ def upload():
 
     ext = Path(file.filename).suffix.lower()
     if ext not in ALLOWED_EXTENSIONS:
-        return jsonify({"error": "不支持的文件格式，仅支持 .txt / .md / .pdf"}), 400
+        return jsonify({"error": "不支持的文件格式，仅支持 .md 文件"}), 400
 
     raw: bytes = file.read()
     doc_id = f"doc_{uuid.uuid4().hex[:12]}"
 
-    if ext == ".pdf":
-        try:
-            content = load_pdf(raw)
-        except Exception:
-            return jsonify({"error": "无法解析 PDF 文件，请确认文件有效"}), 400
-    else:
-        content = load_bytes(raw)
+    content = load_bytes(raw)
 
     chunks = chunker.chunk_text(content)
     if not chunks:
@@ -164,8 +158,8 @@ def ask():
                 "latency_ms": round((time.time() - _t0) * 1000),
                 "vector_n": VECTOR_N,
                 "bm25_n": BM25_N,
-                "vector_raw": 0,
-                "bm25_raw": 0,
+                "vector_hits": [],
+                "bm25_hits": [],
                 "final_count": 0,
                 "src_vector": 0,
                 "src_bm25": 0,
@@ -249,6 +243,12 @@ def ask():
         )
 
         # 4. 记录日志
+        vector_hits = [
+            f"{r['filename']}#{r['chunk_index']}" for r in vector_results
+        ]
+        bm25_hits = [
+            f"{r['filename']}#{r['chunk_index']}" for r in bm25_results
+        ]
         query_log.log_query({
             "original_question": question,
             "rewritten": rewritten,
@@ -256,8 +256,8 @@ def ask():
             "latency_ms": round((time.time() - _t0) * 1000),
             "vector_n": VECTOR_N,
             "bm25_n": BM25_N,
-            "vector_raw": len(vector_results),
-            "bm25_raw": len(bm25_results),
+            "vector_hits": vector_hits,
+            "bm25_hits": bm25_hits,
             "final_count": len(results),
             "src_vector": source_dist["vector"],
             "src_bm25": source_dist["bm25"],

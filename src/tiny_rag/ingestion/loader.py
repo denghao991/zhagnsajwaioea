@@ -27,16 +27,3 @@ def load_bytes(content: bytes) -> str:
     return content.decode("utf-8")
 
 
-def load_pdf(content: bytes) -> str:
-    """Extract text from PDF bytes using PyMuPDF.
-
-    Args:
-        content: Raw bytes of a PDF file.
-
-    Returns:
-        Extracted plain text.
-    """
-    import fitz
-
-    with fitz.open(stream=content, filetype="pdf") as doc:
-        return "\n".join(page.get_text() for page in doc)

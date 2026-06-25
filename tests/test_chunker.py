@@ -1,43 +1,11 @@
 """Tests for chunker module."""
 
-from src.tiny_rag.ingestion.chunker import chunk_text, MarkdownChunker, ChunkResult
-
-
-# ── Original chunk_text tests (backward compat) ──
-
-def test_chunk_text_single_chunk():
-    text = "Short text."
-    chunks = chunk_text(text, chunk_size=100, chunk_overlap=0)
-    assert len(chunks) == 1
-    assert chunks[0] == text
-
-
-def test_chunk_text_multiple_chunks():
-    text = "hello " * 200
-    chunks = chunk_text(text, chunk_size=100, chunk_overlap=0)
-    assert len(chunks) >= 2
-
-
-def test_chunk_text_with_overlap():
-    text = "word " * 500
-    chunks = chunk_text(text, chunk_size=100, chunk_overlap=20)
-    assert len(chunks) >= 2
-    assert all(len(c) > 0 for c in chunks)
-
-
-def test_chunk_text_empty():
-    assert chunk_text("", chunk_size=100, chunk_overlap=0) == []
-
-
-def test_chunk_text_raises_on_invalid_params():
-    import pytest
-    with pytest.raises(ValueError, match="overlap"):
-        chunk_text("text", chunk_size=100, chunk_overlap=200)
+from src.tiny_rag.ingestion.chunker import MarkdownChunker, ChunkResult
 
 
 # ── MarkdownChunker tests ──
 
-def make_chunker(chunk_size=512, chunk_overlap=64):
+def make_chunker(chunk_size=512, chunk_overlap=0):
     return MarkdownChunker(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
 
 
@@ -66,12 +34,16 @@ def test_markdown_single_heading():
 
 
 def test_markdown_heading_hierarchy():
+    """h1 and h2 create sections; h3 content stays inside parent h2 section."""
     text = "# Level1\n\nIntro\n\n## Level2\n\nDetail\n\n### Level3\n\nDeep"
     chunks = make_chunker(chunk_size=512).chunk_text(text)
     paths = [c.heading_path for c in chunks]
-    assert any("Level1" in p for p in paths)
-    assert any("Level2" in p for p in paths)
-    assert any("Level3" in p for p in paths)
+    assert "Level1" in paths
+    assert "Level1 > Level2" in paths
+    # h3 content is inside the h2 section
+    level3_chunks = [c for c in chunks if "Deep" in c.text]
+    assert len(level3_chunks) > 0
+    assert "Level1 > Level2" in level3_chunks[0].heading_path
 
 
 def test_markdown_heading_stack_resets():
@@ -85,7 +57,7 @@ def test_markdown_heading_stack_resets():
 
 
 def test_markdown_preamble():
-    """Content before first heading should be included in a chunk (merged with next section)."""
+    """Content before first heading should be included in a chunk."""
     text = "Preamble paragraph.\n\n# Title\n\nBody."
     chunks = make_chunker(chunk_size=512).chunk_text(text)
     all_text = " ".join(c.text for c in chunks)
@@ -109,16 +81,16 @@ def test_markdown_table_protected():
     assert "| 1 | 2 |" in chunks[0].text
 
 
-def test_markdown_small_section_merged():
-    """Sections under 100 tokens should merge with the next."""
+def test_markdown_small_section():
+    """Small heading sections stay as their own chunk (no cross-heading merge)."""
     text = "# A\n\nSmall.\n\n# B\n\nLarger content here.\n\nMore content.\n\nStill going to fill up tokens."
     chunks = make_chunker(chunk_size=512).chunk_text(text)
     all_text = " ".join(c.text for c in chunks)
     assert "Small" in all_text
 
 
-def test_markdown_last_section_orphan():
-    """Last small section should merge backward."""
+def test_markdown_last_section_no_merge():
+    """Last small section stays as its own chunk."""
     text = "# Main\n\nThis is substantial content to ensure tokens are above threshold.\n\n" * 5
     text += "# Tiny\n\nSmall."
     chunks = make_chunker(chunk_size=512).chunk_text(text)
@@ -163,11 +135,12 @@ def test_markdown_heading_path_preserved():
 
 
 def test_markdown_nested_heading_path():
+    """Only h1 and h2 appear in heading_path; deeper headings stay in content."""
     text = "# Root\n\n## Child\n\n### Grandchild\n\nDeep content."
     chunks = make_chunker(chunk_size=512).chunk_text(text)
     for c in chunks:
         if "Deep content" in c.text:
-            assert c.heading_path == "Root > Child > Grandchild"
+            assert c.heading_path == "Root > Child"
 
 
 def test_markdown_chunk_result_fields():

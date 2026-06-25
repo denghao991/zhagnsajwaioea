@@ -1,16 +1,16 @@
 # 语义缓存
 cache:
-  threshold: 0.03
-  max_entries: 500
+  threshold: 0.03     # 余弦距离阈值，低于此值的视为语义相同 → 直接命中缓存
+  max_entries: 500    # 缓存最大条目数，超出后淘汰最旧的条目
 
 # 检索配置
 retrieval:
-  vector_n: 12
-  bm25_n: 4
-  alpha: 1.0
-  beta: 1.0
+  vector_n: 12        # 向量检索取 top N
+  bm25_n: 4           # BM25 检索取 top N
+  alpha: 7.0          # 向量检索在 RRF 融合中的权重
+  beta: 3.0           # BM25 检索在 RRF 融合中的权重
 
-# 缩写 → 全称映射（查询改写用）
+# 缩写 → 全称映射（查询改写用，LLM 参考）
 term_map:
   OA: 优化顾问(OA)
   CSS: 云服务CSS

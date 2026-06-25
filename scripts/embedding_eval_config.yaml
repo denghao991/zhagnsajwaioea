@@ -1,0 +1,62 @@
+# Embedding 模型评估配置
+# 使用方法：
+#   1. 把 .md 测试文件放入 doc_dir
+#   2. 填写 data/eval/qa_pairs.yaml（问题 + 期望命中的 chunk）
+#   3. 编辑此文件，填入要评估的模型
+#   4. python scripts/embedding_eval.py
+
+# 测试文档目录
+doc_dir: "data/eval/md"
+
+# 评估结果输出目录
+output_dir: "data/eval/results"
+
+# QA pairs（问题集）路径
+qa_pairs_path: "data/eval/qa_pairs.yaml"
+
+models:
+  # ---- DashScope 文本 Embedding 系列 ----
+  - name: "text-embedding-v1"
+    api_key_env: "DASHSCOPE_API_KEY"
+    base_url: "https://dashscope.aliyuncs.com/compatible-mode/v1"
+    model: "text-embedding-v1"
+    # 不支持 dimensions 参数，固定输出 1536 维
+    max_input_tokens: 2048
+    batch_size: 10
+    price_per_million_tokens: 0.0007
+
+  - name: "text-embedding-v2"
+    api_key_env: "DASHSCOPE_API_KEY"
+    base_url: "https://dashscope.aliyuncs.com/compatible-mode/v1"
+    model: "text-embedding-v2"
+    # 不支持 dimensions 参数，固定输出 1536 维
+    max_input_tokens: 2048
+    batch_size: 10
+    price_per_million_tokens: 0.0007
+
+  - name: "text-embedding-v3 (dim=512)"
+    api_key_env: "DASHSCOPE_API_KEY"
+    base_url: "https://dashscope.aliyuncs.com/compatible-mode/v1"
+    model: "text-embedding-v3"
+    dimensions: 512
+    max_input_tokens: 8192
+    batch_size: 10
+    price_per_million_tokens: 0.0005
+
+  - name: "text-embedding-v3 (dim=1024)"
+    api_key_env: "DASHSCOPE_API_KEY"
+    base_url: "https://dashscope.aliyuncs.com/compatible-mode/v1"
+    model: "text-embedding-v3"
+    dimensions: 1024
+    max_input_tokens: 8192
+    batch_size: 10
+    price_per_million_tokens: 0.0005
+
+  - name: "text-embedding-v3 (dim=1536)"
+    api_key_env: "DASHSCOPE_API_KEY"
+    base_url: "https://dashscope.aliyuncs.com/compatible-mode/v1"
+    model: "text-embedding-v3"
+    dimensions: 1536
+    max_input_tokens: 8192
+    batch_size: 10
+    price_per_million_tokens: 0.0005

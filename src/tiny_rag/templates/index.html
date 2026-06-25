@@ -19,6 +19,14 @@
   .upload-area input { display: none; }
   .upload-area p { color: #666; font-size: 14px; }
   .upload-area .hint { font-size: 12px; color: #999; margin-top: 8px; }
+  .url-upload-area { background: #fff; border: 2px dashed #d0d0d0; border-radius: 12px; padding: 20px 32px; text-align: center; margin-bottom: 24px; transition: border-color .2s; }
+  .url-upload-area:focus-within { border-color: #4a90d9; }
+  .url-input-row { display: flex; gap: 8px; }
+  .url-input-row input { flex: 1; padding: 10px 16px; border: 1px solid #d0d0d0; border-radius: 8px; font-size: 14px; outline: none; }
+  .url-input-row input:focus { border-color: #4a90d9; }
+  .url-input-row button { padding: 10px 20px; background: #52c41a; color: #fff; border: none; border-radius: 8px; font-size: 14px; cursor: pointer; white-space: nowrap; }
+  .url-input-row button:disabled { background: #ccc; cursor: not-allowed; }
+  .url-upload-area .hint { font-size: 12px; color: #999; margin-top: 8px; }
   .chat-area { flex: 1; display: flex; flex-direction: column; }
   .messages { flex: 1; overflow-y: auto; margin-bottom: 16px; }
   .message { padding: 12px 16px; border-radius: 12px; margin-bottom: 12px; max-width: 85%; line-height: 1.6; font-size: 14px; }
@@ -43,9 +51,16 @@
   </aside>
   <div class="main">
     <div class="upload-area" id="upload-area" onclick="document.getElementById('file-input').click()">
-      <input type="file" id="file-input" accept=".txt,.md,.pdf">
+      <input type="file" id="file-input" accept=".md">
       <p>点击上传文档</p>
-      <div class="hint" id="upload-status">支持 .txt / .md / .pdf 文件</div>
+      <div class="hint" id="upload-status">支持 .md 文件</div>
+    </div>
+    <div class="url-upload-area" id="url-upload-area">
+      <div class="url-input-row">
+        <input type="text" id="url-input" placeholder="输入网页链接..." onkeydown="if(event.key==='Enter') uploadUrl()">
+        <button id="url-upload-btn" onclick="uploadUrl()">上传链接</button>
+      </div>
+      <div class="hint" id="url-upload-status">输入网页 URL，自动抓取并索引内容</div>
     </div>
     <div class="chat-area">
       <div class="messages" id="messages">
@@ -213,6 +228,38 @@ function addMessage(text, role, cls='') {
   document.getElementById('messages').appendChild(div);
   div.scrollIntoView({behavior: 'smooth'});
   return div;
+}
+
+async function uploadUrl() {
+  const input = document.getElementById('url-input');
+  const btn = document.getElementById('url-upload-btn');
+  const status = document.getElementById('url-upload-status');
+  const url = input.value.trim();
+  if (!url) { showToast('请输入网页链接', 'error'); return; }
+  btn.disabled = true;
+  status.textContent = '正在抓取...';
+  try {
+    const resp = await fetch('/upload_web', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({url})
+    });
+    const data = await resp.json();
+    if (resp.ok) {
+      const total = data.results.reduce((s, r) => s + r.chunks, 0);
+      showToast('上传成功：' + data.pages + ' 个页面，' + total + ' 个分块', 'success');
+      status.textContent = '已抓取 ' + url;
+      input.value = '';
+      loadDocuments();
+    } else {
+      showToast(data.error, 'error');
+      status.textContent = '抓取失败';
+    }
+  } catch {
+    showToast('网络错误', 'error');
+    status.textContent = '抓取失败';
+  }
+  btn.disabled = false;
 }
 
 async function loadDocuments() {
