@@ -18,6 +18,7 @@ class VectorStore:
         )
         self._collection = self._client.get_or_create_collection(
             name="documents",
+            metadata={"hnsw:space": "cosine"},
         )
 
     def add_document(
